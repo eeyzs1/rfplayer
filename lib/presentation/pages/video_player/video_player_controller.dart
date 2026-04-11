@@ -12,6 +12,7 @@ class MyVideoPlayerController {
   late final VideoPlayerController videoController;
   final String path;
   final String? fileName;
+  final String _historyPath;
   final PlaybackHistoryService _historyService;
   final PlayQueueService _playQueueService;
   late final SubtitleService _subtitleService;
@@ -23,10 +24,12 @@ class MyVideoPlayerController {
   MyVideoPlayerController(
     this.path, {
     this.fileName,
+    String? historyPath,
     required PlaybackHistoryService historyService,
     required PlayQueueService playQueueService,
     required void Function() onStateChanged,
-  })  : _historyService = historyService,
+  })  : _historyPath = historyPath ?? path,
+        _historyService = historyService,
         _playQueueService = playQueueService,
         _onStateChanged = onStateChanged {
     videoController = VideoPlayerController.file(File(path));
@@ -64,7 +67,7 @@ class MyVideoPlayerController {
     final duration = videoController.value.duration;
 
     final history = await _historyService.getOrCreateHistory(
-      path,
+      _historyPath,
       fileName: fileName,
       totalDuration: duration != Duration.zero ? duration : null,
     );
@@ -115,13 +118,13 @@ class MyVideoPlayerController {
       final position = videoController.value.position;
       final duration = videoController.value.duration;
 
-      await _historyService.updatePosition(path, position);
+      await _historyService.updatePosition(_historyPath, position);
 
       if (duration != Duration.zero) {
         try {
           final progress = position.inMilliseconds / duration.inMilliseconds;
           final currentPlaying = await _playQueueService.getCurrentPlaying();
-          if (currentPlaying != null && currentPlaying.path == path) {
+          if (currentPlaying != null && currentPlaying.path == _historyPath) {
             await _playQueueService.updatePlayProgress(
                 currentPlaying.id, progress);
           }

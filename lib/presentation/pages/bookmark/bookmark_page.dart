@@ -7,6 +7,7 @@ import '../../providers/image_bookmark_provider.dart';
 import '../../providers/thumbnail_provider.dart';
 import '../../../data/models/video_bookmark.dart';
 import '../../../core/utils/toast_utils.dart';
+import '../../../core/utils/real_path_utils.dart';
 import '../../../core/localization/app_localizations.dart';
 
 class BookmarkPage extends ConsumerStatefulWidget {
@@ -101,9 +102,13 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
   }
 
   Widget _buildImageThumbnail(String imagePath) {
+    final effectivePath = RealPathUtils.isContentUri(imagePath) ? null : imagePath;
+    if (effectivePath == null) {
+      return _buildPlaceholderIcon(Icons.image, Colors.green);
+    }
     return Consumer(
       builder: (context, ref, child) {
-        final thumbnailAsync = ref.watch(cachedThumbnailProvider(imagePath));
+        final thumbnailAsync = ref.watch(cachedThumbnailProvider(effectivePath));
 
         return thumbnailAsync.when(
           data: (thumbPath) {
@@ -129,9 +134,13 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
   }
 
   Widget _buildVideoThumbnail(String videoPath) {
+    final effectivePath = RealPathUtils.isContentUri(videoPath) ? null : videoPath;
+    if (effectivePath == null) {
+      return _buildPlaceholderIcon(Icons.video_file, Colors.blue);
+    }
     return Consumer(
       builder: (context, ref, child) {
-        final thumbnailAsync = ref.watch(cachedThumbnailProvider(videoPath));
+        final thumbnailAsync = ref.watch(cachedThumbnailProvider(effectivePath));
 
         return thumbnailAsync.when(
           data: (thumbPath) {
@@ -267,17 +276,49 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
   }
 
   Future<void> _openVideoAtPosition(String videoPath, Duration position) async {
+    String? pathToUse = videoPath;
+    String? originalContentUri;
+
+    if (RealPathUtils.isContentUri(videoPath)) {
+      originalContentUri = videoPath;
+      pathToUse = await RealPathUtils.getSafePath(videoPath);
+      if (pathToUse == null) {
+        if (mounted) {
+          ToastUtils.showToast(context, '无法访问该文件，权限可能已失效');
+        }
+        return;
+      }
+    }
+
     if (mounted) {
       context.push('/video-player', extra: {
-        'path': videoPath,
+        'path': pathToUse,
         'position': position,
+        'originalContentUri': originalContentUri,
       });
     }
   }
 
   Future<void> _openImage(String imagePath) async {
+    String? pathToUse = imagePath;
+    String? originalContentUri;
+
+    if (RealPathUtils.isContentUri(imagePath)) {
+      originalContentUri = imagePath;
+      pathToUse = await RealPathUtils.getSafePath(imagePath);
+      if (pathToUse == null) {
+        if (mounted) {
+          ToastUtils.showToast(context, '无法访问该文件，权限可能已失效');
+        }
+        return;
+      }
+    }
+
     if (mounted) {
-      context.push('/image-viewer', extra: {'path': imagePath});
+      context.push('/image-viewer', extra: {
+        'path': pathToUse,
+        'originalContentUri': originalContentUri,
+      });
     }
   }
 

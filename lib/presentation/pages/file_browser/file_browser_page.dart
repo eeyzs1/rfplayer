@@ -8,7 +8,9 @@ import '../../router/app_router.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/thumbnail_provider.dart';
 import '../../providers/permission_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../../data/models/play_history.dart';
+import '../../../data/models/app_settings.dart';
 import '../../../core/extensions/string_extensions.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../core/constants/supported_formats.dart';
@@ -112,9 +114,13 @@ class _FileBrowserPageState extends ConsumerState<FileBrowserPage> {
       label: 'Image Files',
       extensions: imageFormats.toList(),
     );
+    final audioTypeGroup = XTypeGroup(
+      label: 'Audio Files',
+      extensions: audioFormats.toList(),
+    );
     debugPrint('[FileBrowser] 等待用户选择文件...');
     final result = await FastFilePicker.pickFile(
-      acceptedTypeGroups: [videoTypeGroup, imageTypeGroup],
+      acceptedTypeGroups: [videoTypeGroup, imageTypeGroup, audioTypeGroup],
     );
 
     debugPrint('[FileBrowser] pickFile result: $result');
@@ -124,20 +130,31 @@ class _FileBrowserPageState extends ConsumerState<FileBrowserPage> {
     
     if (result != null) {
       String? pathToUse;
+      String? originalContentUri;
       Uint8List? imageBytes;
       
       debugPrint('[FileBrowser] ======== 处理选择的文件 ========');
       
+      final settings = ref.read(settingsProvider);
+      
       if (result.path != null) {
-        // 普通文件路径
         pathToUse = result.path;
         debugPrint('[FileBrowser] 使用普通文件路径: $pathToUse');
       } else if (result.uri != null) {
-        // Content URI，使用 RealPathUtils 转换为安全路径
         final contentUri = result.uri.toString();
-        debugPrint('[FileBrowser] 获得 content URI，尝试转换为安全路径: $contentUri');
+        debugPrint('[FileBrowser] 获得 content URI: $contentUri');
         
-        // 使用 RealPathUtils.getSafePath 转换为安全路径（永远不会是 content URI）
+        if (settings.historySaveMode == HistorySaveMode.virtualPath && Platform.isAndroid) {
+          debugPrint('[FileBrowser] 虚拟路径模式，尝试持久化 content URI 权限');
+          final persisted = await RealPathUtils.takePersistableUriPermission(contentUri);
+          if (persisted) {
+            debugPrint('[FileBrowser] content URI 权限持久化成功');
+            originalContentUri = contentUri;
+          } else {
+            debugPrint('[FileBrowser] content URI 权限持久化失败，将使用安全路径');
+          }
+        }
+        
         pathToUse = await RealPathUtils.getSafePath(contentUri);
         
         if (pathToUse == null) {
@@ -159,20 +176,20 @@ class _FileBrowserPageState extends ConsumerState<FileBrowserPage> {
       debugPrint('[FileBrowser] pathToUse: $pathToUse, name: ${result.name}');
       if (pathToUse != null) {
         if (mounted) {
-          // 优先使用文件名判断文件类型，因为 URI 可能不包含扩展名
           final isVideo = result.name.isVideoFile || pathToUse.isVideoFile;
           final isImage = result.name.isImageFile || pathToUse.isImageFile;
-          debugPrint('[FileBrowser] isVideo: $isVideo, isImage: $isImage');
+          final isAudio = result.name.isAudioFile || pathToUse.isAudioFile;
+          debugPrint('[FileBrowser] isVideo: $isVideo, isImage: $isImage, isAudio: $isAudio');
           
           if (isVideo) {
             debugPrint('[FileBrowser] 是视频文件，跳转到视频播放器');
             appRouter.push('/video-player', extra: {
               'path': pathToUse,
               'name': result.name,
+              'originalContentUri': originalContentUri,
             });
           } else if (isImage) {
             debugPrint('[FileBrowser] 是图片文件，开始读取字节数据...');
-            // 尝试读取图片字节
             try {
               debugPrint('[FileBrowser] 使用安全路径读取图片字节...');
               final file = File(pathToUse);
@@ -193,6 +210,14 @@ class _FileBrowserPageState extends ConsumerState<FileBrowserPage> {
               'path': pathToUse,
               'name': result.name,
               'bytes': imageBytes,
+              'originalContentUri': originalContentUri,
+            });
+          } else if (isAudio) {
+            debugPrint('[FileBrowser] 是音频文件，跳转到音频播放器');
+            appRouter.push('/audio-player', extra: {
+              'path': pathToUse,
+              'name': result.name,
+              'originalContentUri': originalContentUri,
             });
           }
         }
@@ -245,6 +270,7 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
 
   Widget _buildThumbnail(BuildContext context, WidgetRef ref) {
     final isVideo = widget.history.type == MediaType.video;
+    final isAudio = widget.history.type == MediaType.audio;
     
     return Consumer(
       builder: (context, ref, child) {
@@ -275,9 +301,9 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Icon(
-                isVideo ? Icons.video_file : Icons.image,
+                isVideo ? Icons.video_file : isAudio ? Icons.audio_file : Icons.image,
                 size: 24,
-                color: isVideo ? Colors.blue : Colors.green,
+                color: isVideo ? Colors.blue : isAudio ? Colors.orange : Colors.green,
               ),
             );
           },
@@ -304,9 +330,9 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Icon(
-              isVideo ? Icons.video_file : Icons.image,
+              isVideo ? Icons.video_file : isAudio ? Icons.audio_file : Icons.image,
               size: 24,
-              color: isVideo ? Colors.blue : Colors.green,
+              color: isVideo ? Colors.blue : isAudio ? Colors.orange : Colors.green,
             ),
           ),
         );
@@ -319,6 +345,7 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
     return Consumer(
       builder: (context, ref, child) {
         final isVideo = widget.history.type == MediaType.video;
+        final isAudio = widget.history.type == MediaType.audio;
         bool isFileExists;
         if (RealPathUtils.isContentUri(widget.history.path)) {
           // 对于 content URI，尝试转换为安全路径后检查
@@ -350,7 +377,11 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
             debugPrint('[HistoryListItem] ======== 点击历史记录 ========');
             debugPrint('[HistoryListItem] 原始路径: ${widget.history.path}');
             
-            // 使用 RealPathUtils.getSafePath 转换为安全路径（永远不会是 content URI）
+            String? originalContentUri;
+            if (RealPathUtils.isContentUri(widget.history.path)) {
+              originalContentUri = widget.history.path;
+            }
+            
             final pathToUse = await RealPathUtils.getSafePath(widget.history.path);
             
             if (pathToUse == null) {
@@ -373,12 +404,21 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
               appRouter.push('/video-player', extra: {
                 'path': pathToUse,
                 'name': widget.history.displayName,
+                'originalContentUri': originalContentUri,
+              });
+            } else if (isAudio) {
+              debugPrint('[HistoryListItem] 是音频文件，跳转到音频播放器');
+              appRouter.push('/audio-player', extra: {
+                'path': pathToUse,
+                'name': widget.history.displayName,
+                'originalContentUri': originalContentUri,
               });
             } else {
               debugPrint('[HistoryListItem] 是图片文件，跳转到图片查看器');
               appRouter.push('/image-viewer', extra: {
                 'path': pathToUse,
                 'name': widget.history.displayName,
+                'originalContentUri': originalContentUri,
               });
             }
           },

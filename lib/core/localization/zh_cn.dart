@@ -81,6 +81,7 @@ const Map<String, String> zhCN = {
   // 功能选择
   'playVideo': '播放视频',
   'viewImage': '查看图片',
+  'playAudio': '播放音频',
   
   // 播放列表
   'playList': '播放列表',
@@ -102,6 +103,7 @@ const Map<String, String> zhCN = {
   // 功能卡片描述
   'playVideoDesc': '选择并播放本地视频文件',
   'viewImageDesc': '选择并查看本地图片文件',
+  'playAudioDesc': '选择并播放本地音频文件',
   
   // 书签页面
   'imageBookmarks': '图片书签',
@@ -124,4 +126,19 @@ const Map<String, String> zhCN = {
   'modifiedTime': '修改时间',
   'removeBookmark': '删除书签',
   'bookmarkRemoved': '书签已删除',
+
+  // 音频播放器
+  'audioPlayer': '音频播放器',
+  'audioInfo': '音频信息',
+
+  // 保存模式
+  'saveMode': '保存模式',
+  'saveNone': '不保存',
+  'saveNoneDesc': '不保存任何播放历史和书签',
+  'saveRealPath': '保存文件真实路径',
+  'saveRealPathDesc': '尝试获取文件的真实路径并保存，文件移动后可能失效',
+  'saveVirtualPath': '保存文件虚拟路径',
+  'saveVirtualPathDesc': '仅安卓，保存Content URI并持久化权限，新文件可能需要额外授权',
+  'saveVirtualPathTag': '仅安卓',
+  'saveDisabledHint': '当前保存模式为"不保存"，无法创建书签',
 };

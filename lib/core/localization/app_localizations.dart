@@ -108,6 +108,7 @@ class AppLocalizations {
   // 功能选择
   String get playVideo => localizedStrings['playVideo']!;
   String get viewImage => localizedStrings['viewImage']!;
+  String get playAudio => localizedStrings['playAudio']!;
   
   // 播放列表
   String get playList => localizedStrings['playList']!;
@@ -129,6 +130,7 @@ class AppLocalizations {
   // 功能卡片描述
   String get playVideoDesc => localizedStrings['playVideoDesc']!;
   String get viewImageDesc => localizedStrings['viewImageDesc']!;
+  String get playAudioDesc => localizedStrings['playAudioDesc']!;
   
   // 书签页面
   String get imageBookmarks => localizedStrings['imageBookmarks']!;
@@ -149,6 +151,21 @@ class AppLocalizations {
   String get fileSize => localizedStrings['fileSize']!;
   String get removeBookmark => localizedStrings['removeBookmark']!;
   String get bookmarkRemoved => localizedStrings['bookmarkRemoved']!;
+
+  // 音频播放器
+  String get audioPlayer => localizedStrings['audioPlayer']!;
+  String get audioInfo => localizedStrings['audioInfo']!;
+
+  // 保存模式
+  String get saveMode => localizedStrings['saveMode']!;
+  String get saveNone => localizedStrings['saveNone']!;
+  String get saveNoneDesc => localizedStrings['saveNoneDesc']!;
+  String get saveRealPath => localizedStrings['saveRealPath']!;
+  String get saveRealPathDesc => localizedStrings['saveRealPathDesc']!;
+  String get saveVirtualPath => localizedStrings['saveVirtualPath']!;
+  String get saveVirtualPathDesc => localizedStrings['saveVirtualPathDesc']!;
+  String get saveVirtualPathTag => localizedStrings['saveVirtualPathTag']!;
+  String get saveDisabledHint => localizedStrings['saveDisabledHint']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

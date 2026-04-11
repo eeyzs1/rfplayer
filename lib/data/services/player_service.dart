@@ -13,7 +13,7 @@ class PlayerService extends ChangeNotifier {
   Future<void> initialize(
     String path, {
     String? fileName,
-    required Future<void> Function(String path, String? fileName) onCreateController,
+    required Future<void> Function(String safePath, String? fileName, String originalPath) onCreateController,
     required void Function() onDisposeController,
   }) async {
     if (_isInitializing) {
@@ -31,7 +31,7 @@ class PlayerService extends ChangeNotifier {
         return;
       }
 
-      await onCreateController(pathToUse, fileName);
+      await onCreateController(pathToUse, fileName, path);
 
       _currentPath = pathToUse;
       _isInitialized = true;

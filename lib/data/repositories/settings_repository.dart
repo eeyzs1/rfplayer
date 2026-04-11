@@ -10,6 +10,7 @@ class SettingsRepository {
   static const String _defaultOpenPathKey = 'default_open_path';
   static const String _showHiddenFilesKey = 'show_hidden_files';
   static const String _defaultPlaybackSpeedKey = 'default_playback_speed';
+  static const String _historySaveModeKey = 'history_save_mode';
 
   T _parseEnum<T>(List<T> values, String? name, T defaultValue) {
     if (name == null) return defaultValue;
@@ -45,6 +46,11 @@ class SettingsRepository {
       defaultOpenPath: prefs.getString(_defaultOpenPathKey),
       showHiddenFiles: prefs.getBool(_showHiddenFilesKey) ?? false,
       defaultPlaybackSpeed: prefs.getDouble(_defaultPlaybackSpeedKey) ?? 1.0,
+      historySaveMode: _parseEnum(
+        HistorySaveMode.values,
+        prefs.getString(_historySaveModeKey),
+        HistorySaveMode.realPath,
+      ),
     );
   }
 
@@ -63,5 +69,6 @@ class SettingsRepository {
     }
     await prefs.setBool(_showHiddenFilesKey, settings.showHiddenFiles);
     await prefs.setDouble(_defaultPlaybackSpeedKey, settings.defaultPlaybackSpeed);
+    await prefs.setString(_historySaveModeKey, settings.historySaveMode.name);
   }
 }

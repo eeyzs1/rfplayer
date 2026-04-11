@@ -4,6 +4,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../providers/settings_provider.dart';
 import '../../../data/models/app_settings.dart' as app_settings;
 import '../../../core/localization/app_localizations.dart';
+import '../../../core/utils/platform_utils.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -30,6 +31,8 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 24),
           _buildSectionTitle(context, localizations.playback),
           _buildPlaybackSetting(context, settings, settingsNotifier),
+          const SizedBox(height: 16),
+          _buildHistorySaveModeSetting(context, settings, settingsNotifier),
           const SizedBox(height: 24),
           _buildSectionTitle(context, localizations.about),
           _buildAboutInfo(context),
@@ -243,6 +246,106 @@ class SettingsPage extends ConsumerWidget {
         return localizations.fluent;
       case app_settings.UIStyle.adaptive:
         return localizations.adaptive;
+    }
+  }
+
+  Widget _buildHistorySaveModeSetting(
+    BuildContext context,
+    app_settings.AppSettings settings,
+    SettingsNotifier settingsNotifier,
+  ) {
+    final localizations = AppLocalizations.of(context)!;
+    final isAndroid = PlatformUtils.isAndroid;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(localizations.saveMode),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: app_settings.HistorySaveMode.values.map((mode) {
+                final isVirtualPath = mode == app_settings.HistorySaveMode.virtualPath;
+                final disabled = isVirtualPath && !isAndroid;
+                return ChoiceChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_getHistorySaveModeLabel(context, mode)),
+                      if (isVirtualPath) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: disabled
+                                ? Colors.grey.withValues(alpha: 0.3)
+                                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            localizations.saveVirtualPathTag,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: disabled
+                                  ? Colors.grey
+                                  : Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  selected: settings.historySaveMode == mode,
+                  onSelected: disabled
+                      ? null
+                      : (selected) {
+                          if (selected) {
+                            settingsNotifier.update(
+                              settings.copyWith(historySaveMode: mode),
+                            );
+                          }
+                        },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _getHistorySaveModeDesc(context, settings.historySaveMode),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getHistorySaveModeLabel(BuildContext context, app_settings.HistorySaveMode mode) {
+    final localizations = AppLocalizations.of(context)!;
+    switch (mode) {
+      case app_settings.HistorySaveMode.none:
+        return localizations.saveNone;
+      case app_settings.HistorySaveMode.realPath:
+        return localizations.saveRealPath;
+      case app_settings.HistorySaveMode.virtualPath:
+        return localizations.saveVirtualPath;
+    }
+  }
+
+  String _getHistorySaveModeDesc(BuildContext context, app_settings.HistorySaveMode mode) {
+    final localizations = AppLocalizations.of(context)!;
+    switch (mode) {
+      case app_settings.HistorySaveMode.none:
+        return localizations.saveNoneDesc;
+      case app_settings.HistorySaveMode.realPath:
+        return localizations.saveRealPathDesc;
+      case app_settings.HistorySaveMode.virtualPath:
+        return localizations.saveVirtualPathDesc;
     }
   }
 }

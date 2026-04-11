@@ -2,9 +2,11 @@ import '../constants/supported_formats.dart';
 
 extension StringExtensions on String {
   bool get isVideoFile => fileExtension.isVideoExtension;
-  
+
   bool get isImageFile => fileExtension.isImageExtension;
-  
+
+  bool get isAudioFile => fileExtension.isAudioExtension;
+
   String get fileExtension {
     final lastDotIndex = lastIndexOf('.');
     if (lastDotIndex == -1 || lastDotIndex >= length - 1) return '';
@@ -15,4 +17,5 @@ extension StringExtensions on String {
 extension StringExtensionChecks on String {
   bool get isVideoExtension => videoFormats.contains(this);
   bool get isImageExtension => imageFormats.contains(this);
+  bool get isAudioExtension => audioFormats.contains(this);
 }

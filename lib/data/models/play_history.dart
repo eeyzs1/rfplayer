@@ -4,6 +4,7 @@ import '../../core/extensions/duration_extensions.dart';
 enum MediaType {
   video,
   image,
+  audio,
 }
 
 class PlayHistory {

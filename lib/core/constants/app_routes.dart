@@ -8,4 +8,5 @@ class AppRoutes {
   static const String settings = '/settings';
   static const String videoPlayer = '/video-player';
   static const String imageViewer = '/image-viewer';
+  static const String audioPlayer = '/audio-player';
 }

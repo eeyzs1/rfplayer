@@ -16,6 +16,7 @@ class HistoryListItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isVideo = history.type == MediaType.video;
+    final isAudio = history.type == MediaType.audio;
     bool isFileExists;
     if (history.path.startsWith('content://')) {
       isFileExists = true;
@@ -75,6 +76,11 @@ class HistoryListItem extends ConsumerWidget {
               'path': history.path,
               'name': history.displayName,
             });
+          } else if (isAudio) {
+            appRouter.push('/audio-player', extra: {
+              'path': history.path,
+              'name': history.displayName,
+            });
           } else {
             appRouter.push('/image-viewer', extra: {
               'path': history.path,
@@ -88,6 +94,7 @@ class HistoryListItem extends ConsumerWidget {
 
   Widget _buildThumbnail(BuildContext context, WidgetRef ref) {
     final isVideo = history.type == MediaType.video;
+    final isAudio = history.type == MediaType.audio;
     
     return Consumer(
       builder: (context, ref, child) {
@@ -118,9 +125,9 @@ class HistoryListItem extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Icon(
-                  isVideo ? Icons.video_file : Icons.image,
+                  isVideo ? Icons.video_file : isAudio ? Icons.audio_file : Icons.image,
                   size: 32,
-                  color: Colors.grey[400],
+                  color: isVideo ? Colors.blue : isAudio ? Colors.orange : Colors.green,
                 ),
               );
             }
@@ -148,9 +155,9 @@ class HistoryListItem extends ConsumerWidget {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Icon(
-              isVideo ? Icons.video_file : Icons.image,
+              isVideo ? Icons.video_file : isAudio ? Icons.audio_file : Icons.image,
               size: 32,
-              color: Colors.grey[400],
+              color: isVideo ? Colors.blue : isAudio ? Colors.orange : Colors.green,
             ),
           ),
         );

@@ -41,6 +41,13 @@ class HomePage extends ConsumerWidget {
                   route: '/image-viewer',
                   allowedExtensions: imageFormats.toList(),
                 ),
+                FeatureCard(
+                  icon: Icons.audio_file,
+                  title: loc.playAudio,
+                  description: loc.playAudioDesc,
+                  route: '/audio-player',
+                  allowedExtensions: audioFormats.toList(),
+                ),
               ]),
             ),
           ),

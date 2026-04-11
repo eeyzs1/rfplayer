@@ -7,6 +7,10 @@ const Set<String> imageFormats = {
   'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'tif', 'ico',
 };
 
+const Set<String> audioFormats = {
+  'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'ape', 'alac',
+};
+
 const Set<String> subtitleFormats = {
   'srt', 'ass', 'ssa', 'vtt', 'sub', 'dfxp',
 };
@@ -19,6 +23,11 @@ bool isVideoFile(String path) {
 bool isImageFile(String path) {
   final ext = _getExtension(path);
   return imageFormats.contains(ext);
+}
+
+bool isAudioFile(String path) {
+  final ext = _getExtension(path);
+  return audioFormats.contains(ext);
 }
 
 bool isSubtitleFile(String path) {

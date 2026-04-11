@@ -9,21 +9,33 @@ import '../pages/bookmark/bookmark_page.dart';
 import '../pages/settings/settings_page.dart';
 import '../pages/video_player/video_player_page.dart';
 import '../pages/image_viewer/image_viewer_page.dart';
+import '../pages/audio_player/audio_player_page.dart';
 
 class VideoPlayerRouteExtra {
   final String path;
   final String? name;
   final Duration? position;
+  final String? originalContentUri;
 
-  const VideoPlayerRouteExtra({required this.path, this.name, this.position});
+  const VideoPlayerRouteExtra({required this.path, this.name, this.position, this.originalContentUri});
 }
 
 class ImageViewerRouteExtra {
   final String path;
   final String? name;
   final Uint8List? bytes;
+  final String? originalContentUri;
 
-  const ImageViewerRouteExtra({required this.path, this.name, this.bytes});
+  const ImageViewerRouteExtra({required this.path, this.name, this.bytes, this.originalContentUri});
+}
+
+class AudioPlayerRouteExtra {
+  final String path;
+  final String? name;
+  final Duration? position;
+  final String? originalContentUri;
+
+  const AudioPlayerRouteExtra({required this.path, this.name, this.position, this.originalContentUri});
 }
 
 final appRouter = GoRouter(
@@ -48,13 +60,15 @@ final appRouter = GoRouter(
             path: extra.path,
             fileName: extra.name,
             initialPosition: extra.position,
+            originalContentUri: extra.originalContentUri,
           );
         }
         if (extra is Map<String, dynamic>) {
           final path = extra['path'] as String? ?? '';
           final name = extra['name'] as String?;
           final position = extra['position'] as Duration?;
-          return VideoPlayerPage(path: path, fileName: name, initialPosition: position);
+          final originalContentUri = extra['originalContentUri'] as String?;
+          return VideoPlayerPage(path: path, fileName: name, initialPosition: position, originalContentUri: originalContentUri);
         }
         if (extra is String) {
           return VideoPlayerPage(path: extra);
@@ -67,18 +81,44 @@ final appRouter = GoRouter(
       builder: (_, state) {
         final extra = state.extra;
         if (extra is ImageViewerRouteExtra) {
-          return ImageViewerPage(path: extra.path, fileName: extra.name, bytes: extra.bytes);
+          return ImageViewerPage(path: extra.path, fileName: extra.name, bytes: extra.bytes, originalContentUri: extra.originalContentUri);
         }
         if (extra is Map<String, dynamic>) {
           final path = extra['path'] as String? ?? '';
           final name = extra['name'] as String?;
           final bytes = extra['bytes'] as Uint8List?;
-          return ImageViewerPage(path: path, fileName: name, bytes: bytes);
+          final originalContentUri = extra['originalContentUri'] as String?;
+          return ImageViewerPage(path: path, fileName: name, bytes: bytes, originalContentUri: originalContentUri);
         }
         if (extra is String) {
           return ImageViewerPage(path: extra);
         }
         return const ImageViewerPage(path: '');
+      },
+    ),
+    GoRoute(
+      path: AppRoutes.audioPlayer,
+      builder: (_, state) {
+        final extra = state.extra;
+        if (extra is AudioPlayerRouteExtra) {
+          return AudioPlayerPage(
+            path: extra.path,
+            fileName: extra.name,
+            initialPosition: extra.position,
+            originalContentUri: extra.originalContentUri,
+          );
+        }
+        if (extra is Map<String, dynamic>) {
+          final path = extra['path'] as String? ?? '';
+          final name = extra['name'] as String?;
+          final position = extra['position'] as Duration?;
+          final originalContentUri = extra['originalContentUri'] as String?;
+          return AudioPlayerPage(path: path, fileName: name, initialPosition: position, originalContentUri: originalContentUri);
+        }
+        if (extra is String) {
+          return AudioPlayerPage(path: extra);
+        }
+        return const AudioPlayerPage(path: '');
       },
     ),
   ],

@@ -51,6 +51,9 @@ class ThumbnailService {
     if (['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.3gp', '.m4v'].contains(ext)) {
       return MediaType.video;
     }
+    if (['.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a', '.opus', '.ape', '.alac'].contains(ext)) {
+      return MediaType.audio;
+    }
     return null;
   }
 
@@ -82,6 +85,7 @@ class ThumbnailService {
     } else if (mediaType == MediaType.image) {
       result = await _generateImageThumbnail(filePath, thumbPath, cacheKey);
     }
+    // audio type: no thumbnail needed, return null
 
     return result;
   }

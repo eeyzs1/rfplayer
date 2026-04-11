@@ -7,7 +7,9 @@ import '../../providers/image_viewer_provider.dart';
 import '../../providers/image_bookmark_provider.dart';
 import '../../providers/thumbnail_provider.dart';
 import '../../providers/database_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../../data/models/play_history.dart' as ph;
+import '../../../data/models/app_settings.dart';
 import '../../../core/utils/toast_utils.dart';
 import '../../../core/utils/real_path_utils.dart';
 import '../../../core/localization/app_localizations.dart';
@@ -16,8 +18,9 @@ class ImageViewerPage extends ConsumerStatefulWidget {
   final String path;
   final String? fileName;
   final Uint8List? bytes;
+  final String? originalContentUri;
 
-  const ImageViewerPage({super.key, required this.path, this.fileName, this.bytes});
+  const ImageViewerPage({super.key, required this.path, this.fileName, this.bytes, this.originalContentUri});
 
   @override
   ConsumerState<ImageViewerPage> createState() => _ImageViewerPageState();
@@ -40,32 +43,41 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
     if (!mounted) return;
     
     try {
-      // 先确保使用安全路径，避免同一个文件被保存多次
+      final settings = ref.read(settingsProvider);
+      if (settings.historySaveMode == HistorySaveMode.none) return;
+
       final safePath = await RealPathUtils.getSafePath(widget.path);
-      final pathToUse = safePath ?? widget.path;
+      final playbackPath = safePath ?? widget.path;
+
+      String historyPath;
+      if (settings.historySaveMode == HistorySaveMode.virtualPath &&
+          (RealPathUtils.isContentUri(widget.path) || RealPathUtils.isContentUri(widget.originalContentUri ?? ''))) {
+        historyPath = widget.originalContentUri ?? widget.path;
+      } else {
+        historyPath = playbackPath;
+      }
       
       debugPrint('[ImageViewerPage] 原路径: ${widget.path}');
-      debugPrint('[ImageViewerPage] 安全路径: $pathToUse');
+      debugPrint('[ImageViewerPage] 安全路径: $playbackPath');
+      debugPrint('[ImageViewerPage] 历史路径: $historyPath');
       
       final historyRepo = ref.read(historyRepositoryProvider);
-      var history = await historyRepo.getByPath(pathToUse);
+      var history = await historyRepo.getByPath(historyPath);
       
       String extension;
       if (widget.fileName != null) {
-        // 从 fileName 中提取扩展名
         final ext = p.extension(widget.fileName!).toLowerCase();
         extension = ext.length > 1 ? ext.substring(1) : ext;
       } else {
-        // 从 path 中提取扩展名
-        final ext = p.extension(pathToUse).toLowerCase();
+        final ext = p.extension(playbackPath).toLowerCase();
         extension = ext.length > 1 ? ext.substring(1) : ext;
       }
       
       if (history == null) {
         history = ph.PlayHistory(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
-          path: pathToUse,
-          displayName: widget.fileName ?? p.basename(pathToUse),
+          path: historyPath,
+          displayName: widget.fileName ?? p.basename(playbackPath),
           extension: extension,
           type: ph.MediaType.image,
           lastPosition: Duration.zero,
@@ -75,7 +87,6 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
         );
         await historyRepo.upsert(history);
         
-        // 异步生成缩略图
         _generateThumbnailAsync();
       } else {
         final updatedHistory = ph.PlayHistory(
@@ -92,7 +103,6 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
         );
         await historyRepo.upsert(updatedHistory);
         
-        // 如果没有缩略图，异步生成
         if (history.thumbnailPath == null) {
           _generateThumbnailAsync();
         }
@@ -106,17 +116,25 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
     if (!mounted) return;
     
     try {
-      // 先确保使用安全路径
+      final settings = ref.read(settingsProvider);
       final safePath = await RealPathUtils.getSafePath(widget.path);
-      final pathToUse = safePath ?? widget.path;
+      final playbackPath = safePath ?? widget.path;
+
+      String historyPath;
+      if (settings.historySaveMode == HistorySaveMode.virtualPath &&
+          (RealPathUtils.isContentUri(widget.path) || RealPathUtils.isContentUri(widget.originalContentUri ?? ''))) {
+        historyPath = widget.originalContentUri ?? widget.path;
+      } else {
+        historyPath = playbackPath;
+      }
       
       final thumbnailService = ref.read(thumbnailServiceProvider);
       final historyRepo = ref.read(historyRepositoryProvider);
       
-      final thumbPath = await thumbnailService.generateThumbnail(pathToUse);
+      final thumbPath = await thumbnailService.generateThumbnail(playbackPath);
       
       if (thumbPath != null && mounted) {
-        var history = await historyRepo.getByPath(pathToUse);
+        var history = await historyRepo.getByPath(historyPath);
         if (history != null) {
           final updatedHistory = ph.PlayHistory(
             id: history.id,
@@ -175,23 +193,33 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
                       Consumer(
                         builder: (context, ref, child) {
                           final bookmarks = ref.watch(imageBookmarkProvider);
-                          final isBookmarked = bookmarks.any((b) => b.imagePath == state.currentPath);
+                          final settings = ref.read(settingsProvider);
+                          final effectivePath = settings.historySaveMode == HistorySaveMode.virtualPath &&
+                                  widget.originalContentUri != null
+                              ? widget.originalContentUri!
+                              : state.currentPath;
+                          final isBookmarked = bookmarks.any((b) => b.imagePath == effectivePath);
                           return IconButton(
                             icon: Icon(
                               isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                               color: Colors.white,
                             ),
                             onPressed: () async {
+                              if (settings.historySaveMode == HistorySaveMode.none) {
+                                if (context.mounted) {
+                                  final localizations = AppLocalizations.of(context)!;
+                                  ToastUtils.showToast(context, localizations.saveDisabledHint);
+                                }
+                                return;
+                              }
                               await ref.read(imageBookmarkProvider.notifier).toggleBookmark(
-                                state.currentPath,
+                                effectivePath,
                                 state.currentFileName,
                               );
                               if (mounted) {
                                 if (isBookmarked) {
-                                  // ignore: use_build_context_synchronously
                                   ToastUtils.showToast(context, '${loc.bookmarkRemoved}: ${state.currentFileName}');
                                 } else {
-                                  // ignore: use_build_context_synchronously
                                   ToastUtils.showToast(context, '${loc.bookmarkAdded}: ${state.currentFileName}');
                                 }
                               }

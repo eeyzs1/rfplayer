@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_file_picker/fast_file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import '../../../router/app_router.dart';
+import '../../../../data/models/app_settings.dart';
+import '../../../../core/utils/real_path_utils.dart';
+import '../../../providers/settings_provider.dart';
 
-class FeatureCard extends StatelessWidget {
+class FeatureCard extends ConsumerWidget {
   final IconData icon;
   final String title;
   final String description;
@@ -20,7 +25,7 @@ class FeatureCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -38,16 +43,29 @@ class FeatureCard extends StatelessWidget {
 
           if (result != null) {
             String? pathToUse;
+            String? originalContentUri;
+            
             if (result.path != null) {
               pathToUse = result.path;
             } else if (result.uri != null) {
-              pathToUse = result.uri.toString();
+              final contentUri = result.uri.toString();
+              
+              final settings = ref.read(settingsProvider);
+              if (settings.historySaveMode == HistorySaveMode.virtualPath && Platform.isAndroid) {
+                final persisted = await RealPathUtils.takePersistableUriPermission(contentUri);
+                if (persisted) {
+                  originalContentUri = contentUri;
+                }
+              }
+              
+              pathToUse = await RealPathUtils.getSafePath(contentUri);
             }
             
             if (pathToUse != null) {
               appRouter.push(route, extra: {
                 'path': pathToUse,
                 'name': result.name,
+                'originalContentUri': originalContentUri,
               });
             }
           }

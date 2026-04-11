@@ -22,6 +22,7 @@ import '../../../presentation/providers/video_bookmark_provider.dart';
 import '../../../presentation/providers/volume_provider.dart';
 import '../../../presentation/providers/thumbnail_provider.dart';
 import '../../../domain/services/playback_history_service.dart';
+import '../../../data/models/app_settings.dart' show HistorySaveMode;
 import 'widgets/windows_play_list_panel.dart';
 import 'widgets/android_play_list_drawer.dart';
 import 'package:path/path.dart' as p;
@@ -301,8 +302,9 @@ class VideoPlayerPage extends ConsumerStatefulWidget {
   final String path;
   final Duration? initialPosition;
   final String? fileName;
+  final String? originalContentUri;
 
-  const VideoPlayerPage({super.key, required this.path, this.initialPosition, this.fileName});
+  const VideoPlayerPage({super.key, required this.path, this.initialPosition, this.fileName, this.originalContentUri});
 
   @override
   ConsumerState<VideoPlayerPage> createState() => _VideoPlayerPageState();
@@ -583,13 +585,19 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
         await playerService.initialize(
           currentPlaying.path,
           fileName: newFileName,
-          onCreateController: (safePath, fName) async {
+          onCreateController: (safePath, fName, originalPath) async {
+            final settings = ref.read(settingsProvider);
+            final effectiveHistoryPath = settings.historySaveMode == HistorySaveMode.virtualPath
+                ? (RealPathUtils.isContentUri(originalPath) ? originalPath : null)
+                : null;
             final controller = MyVideoPlayerController(
               safePath,
               fileName: fName,
+              historyPath: effectiveHistoryPath,
               historyService: PlaybackHistoryService(
                 repository: ref.read(historyRepositoryProvider),
                 thumbnailService: ref.read(thumbnailServiceProvider),
+                historySaveMode: settings.historySaveMode,
               ),
               playQueueService: ref.read(playQueueServiceProvider),
               onStateChanged: () => playerService.notifyStateChanged(),
@@ -674,13 +682,20 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
       await playerService.initialize(
         widget.path,
         fileName: fileName,
-        onCreateController: (safePath, fName) async {
+        onCreateController: (safePath, fName, originalPath) async {
+          final settings = ref.read(settingsProvider);
+          final virtualPathCandidate = widget.originalContentUri ?? originalPath;
+          final effectiveHistoryPath = settings.historySaveMode == HistorySaveMode.virtualPath
+              ? (RealPathUtils.isContentUri(virtualPathCandidate) ? virtualPathCandidate : null)
+              : null;
           final controller = MyVideoPlayerController(
             safePath,
             fileName: fName,
+            historyPath: effectiveHistoryPath,
             historyService: PlaybackHistoryService(
               repository: ref.read(historyRepositoryProvider),
               thumbnailService: ref.read(thumbnailServiceProvider),
+              historySaveMode: settings.historySaveMode,
             ),
             playQueueService: ref.read(playQueueServiceProvider),
             onStateChanged: () => playerService.notifyStateChanged(),
@@ -1150,11 +1165,22 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
     final playerService = ref.read(playerServiceProvider);
     if (!playerService.isInitialized || playerService.controller == null) return;
     
+    final settings = ref.read(settingsProvider);
+    if (settings.historySaveMode == HistorySaveMode.none) {
+      if (mounted) {
+        final localizations = AppLocalizations.of(context)!;
+        ToastUtils.showToast(context, localizations.saveDisabledHint);
+      }
+      return;
+    }
+
     final currentPosition = playerService.controller!.position;
-    final videoPath = widget.path;
-    final videoName = p.basename(videoPath);
+    final videoPath = settings.historySaveMode == HistorySaveMode.virtualPath &&
+            widget.originalContentUri != null
+        ? widget.originalContentUri!
+        : widget.path;
+    final videoName = p.basename(widget.path);
     
-    // 显示添加书签对话框
     if (mounted) {
       String? note;
       await showDialog(
@@ -1190,7 +1216,6 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
                   note: note?.isNotEmpty == true ? note : null,
                 );
                 if (mounted) {
-                  // ignore: use_build_context_synchronously
                   ToastUtils.showToast(context, '书签已添加: ${_formatDuration(currentPosition)}');
                 }
               },

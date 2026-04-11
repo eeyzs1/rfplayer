@@ -2,20 +2,25 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../../data/models/play_history.dart';
+import '../../data/models/app_settings.dart';
 import '../../data/repositories/history_repository.dart';
+import '../../core/constants/supported_formats.dart';
 import 'thumbnail_service.dart';
 
 class PlaybackHistoryService {
   final HistoryRepository _repository;
   final ThumbnailService _thumbnailService;
+  final HistorySaveMode _historySaveMode;
   Timer? _debounceTimer;
   bool _disposed = false;
 
   PlaybackHistoryService({
     required HistoryRepository repository,
     required ThumbnailService thumbnailService,
+    HistorySaveMode historySaveMode = HistorySaveMode.realPath,
   })  : _repository = repository,
-        _thumbnailService = thumbnailService;
+        _thumbnailService = thumbnailService,
+        _historySaveMode = historySaveMode;
 
   Future<PlayHistory?> getOrCreateHistory(
     String path, {
@@ -23,6 +28,7 @@ class PlaybackHistoryService {
     Duration? totalDuration,
   }) async {
     if (_disposed) return null;
+    if (_historySaveMode == HistorySaveMode.none) return null;
 
     var history = await _repository.getByPath(path);
 
@@ -59,13 +65,14 @@ class PlaybackHistoryService {
 
     final ext = _extractExtension(fileName ?? path);
     final displayName = fileName ?? p.basename(path);
+    final mediaType = _detectMediaType(ext);
 
     final history = PlayHistory(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       path: path,
       displayName: displayName,
       extension: ext,
-      type: MediaType.video,
+      type: mediaType,
       lastPosition: Duration.zero,
       totalDuration: totalDuration,
       lastPlayedAt: DateTime.now(),
@@ -74,7 +81,9 @@ class PlaybackHistoryService {
 
     await _repository.upsert(history);
 
-    _generateThumbnailAsync(path);
+    if (mediaType != MediaType.audio) {
+      _generateThumbnailAsync(path, type: mediaType);
+    }
 
     return history;
   }
@@ -86,13 +95,14 @@ class PlaybackHistoryService {
   ) {
     final ext = _extractExtension(fileName ?? path);
     final displayName = fileName ?? p.basename(path);
+    final mediaType = _detectMediaType(ext);
 
     return PlayHistory(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       path: path,
       displayName: displayName,
       extension: ext,
-      type: MediaType.video,
+      type: mediaType,
       lastPosition: Duration.zero,
       totalDuration: totalDuration,
       lastPlayedAt: DateTime.now(),
@@ -184,12 +194,12 @@ class PlaybackHistoryService {
     }
   }
 
-  void _generateThumbnailAsync(String path) async {
+  void _generateThumbnailAsync(String path, {MediaType? type}) async {
     if (_disposed) return;
     try {
       final thumbPath = await _thumbnailService.generateThumbnail(
         path,
-        type: MediaType.video,
+        type: type,
       );
 
       if (thumbPath != null && !_disposed) {
@@ -220,6 +230,19 @@ class PlaybackHistoryService {
   String _extractExtension(String filename) {
     final ext = p.extension(filename).toLowerCase();
     return ext.length > 1 ? ext.substring(1) : ext;
+  }
+
+  MediaType _detectMediaType(String extension) {
+    if (videoFormats.contains(extension)) {
+      return MediaType.video;
+    }
+    if (audioFormats.contains(extension)) {
+      return MediaType.audio;
+    }
+    if (imageFormats.contains(extension)) {
+      return MediaType.image;
+    }
+    return MediaType.video;
   }
 
   void dispose() {

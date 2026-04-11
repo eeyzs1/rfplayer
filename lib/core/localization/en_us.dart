@@ -81,6 +81,7 @@ const Map<String, String> enUS = {
   // 功能选择
   'playVideo': 'Play Video',
   'viewImage': 'View Image',
+  'playAudio': 'Play Audio',
   
   // 播放列表
   'playList': 'Playlist',
@@ -102,6 +103,7 @@ const Map<String, String> enUS = {
   // 功能卡片描述
   'playVideoDesc': 'Select and play local video files',
   'viewImageDesc': 'Select and view local image files',
+  'playAudioDesc': 'Select and play local audio files',
   
   // 书签页面
   'imageBookmarks': 'Image Bookmarks',
@@ -124,4 +126,19 @@ const Map<String, String> enUS = {
   'modifiedTime': 'Modified Time',
   'removeBookmark': 'Remove Bookmark',
   'bookmarkRemoved': 'Bookmark removed',
+
+  // 音频播放器
+  'audioPlayer': 'Audio Player',
+  'audioInfo': 'Audio Info',
+
+  // Save Mode
+  'saveMode': 'Save Mode',
+  'saveNone': 'Don\'t Save',
+  'saveNoneDesc': 'Don\'t save any playback history or bookmarks',
+  'saveRealPath': 'Save Real Path',
+  'saveRealPathDesc': 'Try to get and save the real file path, may become invalid after file moves',
+  'saveVirtualPath': 'Save Virtual Path',
+  'saveVirtualPathDesc': 'Android only, save Content URI with persistent permission, new files may require additional authorization',
+  'saveVirtualPathTag': 'Android Only',
+  'saveDisabledHint': 'Save mode is "Don\'t Save", cannot create bookmarks',
 };

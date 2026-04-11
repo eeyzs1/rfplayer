@@ -16,6 +16,12 @@ enum AppLanguage {
   enUs,
 }
 
+enum HistorySaveMode {
+  none,
+  realPath,
+  virtualPath,
+}
+
 class AppSettings {
   final AppThemeMode themeMode;
   final UIStyle uiStyle;
@@ -25,6 +31,7 @@ class AppSettings {
   final String? defaultOpenPath;
   final bool showHiddenFiles;
   final double defaultPlaybackSpeed;
+  final HistorySaveMode historySaveMode;
 
   static const _sentinel = Object();
 
@@ -37,6 +44,7 @@ class AppSettings {
     this.defaultOpenPath,
     this.showHiddenFiles = false,
     this.defaultPlaybackSpeed = 1.0,
+    this.historySaveMode = HistorySaveMode.realPath,
   });
 
   AppSettings copyWith({
@@ -48,6 +56,7 @@ class AppSettings {
     Object? defaultOpenPath = _sentinel,
     bool? showHiddenFiles,
     double? defaultPlaybackSpeed,
+    HistorySaveMode? historySaveMode,
   }) {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
@@ -58,6 +67,7 @@ class AppSettings {
       defaultOpenPath: identical(defaultOpenPath, _sentinel) ? this.defaultOpenPath : defaultOpenPath as String?,
       showHiddenFiles: showHiddenFiles ?? this.showHiddenFiles,
       defaultPlaybackSpeed: defaultPlaybackSpeed ?? this.defaultPlaybackSpeed,
+      historySaveMode: historySaveMode ?? this.historySaveMode,
     );
   }
 }
