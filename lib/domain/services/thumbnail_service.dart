@@ -100,9 +100,7 @@ class ThumbnailService {
       }
       _memoryCache.clear();
       _cacheKeyOrder.clear();
-    } catch (e) {
-      debugPrint('[ThumbnailService] Failed to clear cache: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> clearThumbnail(String filePath) async {
@@ -117,9 +115,7 @@ class ThumbnailService {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (e) {
-      debugPrint('[ThumbnailService] Failed to clear thumbnail: $e');
-    }
+    } catch (_) {}
   }
 
   Future<String?> _generateVideoThumbnail(String filePath, String thumbPath, String cacheKey) async {
@@ -158,10 +154,7 @@ class ThumbnailService {
           }
         }
       }
-    } catch (e, stackTrace) {
-      debugPrint('[Thumbnail] ERROR generating video thumbnail: $e');
-      debugPrint('[Thumbnail] Stack trace: $stackTrace');
-    }
+    } catch (_) {}
     return null;
   }
 
@@ -206,9 +199,7 @@ class ThumbnailService {
       } else {
         return null;
       }
-    } catch (e, stackTrace) {
-      debugPrint('[Thumbnail Isolate] ERROR: $e');
-      debugPrint('[Thumbnail Isolate] Stack trace: $stackTrace');
+    } catch (_) {
       return null;
     }
   }
@@ -235,7 +226,6 @@ class ThumbnailService {
       _addToMemoryCache(cacheKey, thumbPath);
       return thumbPath;
     } catch (e) {
-      debugPrint('[ThumbnailService] Failed to generate image thumbnail: $e');
       try {
         final file = File(filePath);
         if (await file.exists()) {
@@ -243,9 +233,7 @@ class ThumbnailService {
           _addToMemoryCache(cacheKey, thumbPath);
           return thumbPath;
         }
-      } catch (e2) {
-        debugPrint('[ThumbnailService] Fallback copy also failed: $e2');
-      }
+      } catch (_) {}
     }
     return null;
   }

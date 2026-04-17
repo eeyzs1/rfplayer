@@ -20,6 +20,14 @@ class SubtitleParser {
     final bytes = await file.readAsBytes();
     final content = _decodeBytes(bytes);
 
+    return parseContent(content, extension);
+  }
+
+  static List<SubtitleItem> parseContent(String content, String extension) {
+    if (!subtitleFormats.contains(extension)) {
+      throw UnsupportedError('Unsupported subtitle format: $extension');
+    }
+
     switch (extension) {
       case 'srt':
         return _parseSrt(content);
@@ -28,6 +36,13 @@ class SubtitleParser {
         return _parseAss(content);
       case 'vtt':
         return _parseVtt(content);
+      case 'sub':
+        return _parseSub(content);
+      case 'dfxp':
+      case 'ttml':
+        return _parseTtml(content);
+      case 'smi':
+        return _parseSami(content);
       default:
         throw UnsupportedError('Unsupported subtitle format: $extension');
     }
@@ -246,6 +261,206 @@ class SubtitleParser {
         startTime: startTime,
         endTime: endTime,
         content: contentBuffer.toString(),
+      ));
+    }
+
+    return items;
+  }
+
+  static List<SubtitleItem> _parseSub(String content) {
+    final items = <SubtitleItem>[];
+    final lines = content.split(RegExp(r'\r?\n'));
+    double fps = 23.976;
+
+    final firstLineMatch = RegExp(r'^\{1\}\{1\}(\d+(?:\.\d+)?)$').firstMatch(lines.first.trim());
+    if (firstLineMatch != null) {
+      fps = double.tryParse(firstLineMatch.group(1)!) ?? 23.976;
+    }
+
+    final microDvdRegex = RegExp(r'^\{(\d+)\}\{(\d+)\}(.*)$');
+    final subViewerRegex = RegExp(r'^\[(\d{1,2}:\d{2}:\d{2}\.\d{2,3})\]\[(\d{1,2}:\d{2}:\d{2}\.\d{2,3})\](.*)$');
+
+    for (final line in lines) {
+      final trimmedLine = line.trim();
+      if (trimmedLine.isEmpty) continue;
+
+      final microMatch = microDvdRegex.firstMatch(trimmedLine);
+      if (microMatch != null) {
+        final startFrame = int.tryParse(microMatch.group(1)!) ?? 0;
+        final endFrame = int.tryParse(microMatch.group(2)!) ?? 0;
+        final text = microMatch.group(3)?.trim() ?? '';
+        if (text.isEmpty) continue;
+
+        final startTime = Duration(milliseconds: (startFrame / fps * 1000).round());
+        final endTime = Duration(milliseconds: (endFrame / fps * 1000).round());
+
+        items.add(SubtitleItem(
+          index: items.length + 1,
+          startTime: startTime,
+          endTime: endTime,
+          content: text.replaceAll('|', '\n'),
+        ));
+        continue;
+      }
+
+      final svMatch = subViewerRegex.firstMatch(trimmedLine);
+      if (svMatch != null) {
+        final startTime = _parseSubViewerTime(svMatch.group(1)!);
+        final endTime = _parseSubViewerTime(svMatch.group(2)!);
+        final text = svMatch.group(3)?.trim() ?? '';
+        if (text.isEmpty) continue;
+
+        items.add(SubtitleItem(
+          index: items.length + 1,
+          startTime: startTime,
+          endTime: endTime,
+          content: text,
+        ));
+      }
+    }
+
+    return items;
+  }
+
+  static Duration _parseSubViewerTime(String timeStr) {
+    final parts = timeStr.split(':');
+    if (parts.length == 3) {
+      final hours = int.tryParse(parts[0]) ?? 0;
+      final minutes = int.tryParse(parts[1]) ?? 0;
+      final secParts = parts[2].split('.');
+      final seconds = int.tryParse(secParts[0]) ?? 0;
+      int milliseconds = 0;
+      if (secParts.length > 1) {
+        final msStr = secParts[1];
+        if (msStr.length == 2) {
+          milliseconds = (int.tryParse(msStr) ?? 0) * 10;
+        } else if (msStr.length >= 3) {
+          milliseconds = int.tryParse(msStr.substring(0, 3)) ?? 0;
+        }
+      }
+      return Duration(hours: hours, minutes: minutes, seconds: seconds, milliseconds: milliseconds);
+    }
+    return Duration.zero;
+  }
+
+  static List<SubtitleItem> _parseTtml(String content) {
+    final items = <SubtitleItem>[];
+    final pRegex = RegExp(r'<p\b[^>]*\bbegin="([^"]*)"[^>]*\bend="([^"]*)"[^>]*>(.*?)</p>', dotAll: true);
+    final pRegexAlt = RegExp(r'<p\b[^>]*\bend="([^"]*)"[^>]*\bbegin="([^"]*)"[^>]*>(.*?)</p>', dotAll: true);
+
+    for (final regex in [pRegex, pRegexAlt]) {
+      for (final match in regex.allMatches(content)) {
+        final beginStr = match.group(1)!;
+        final endStr = match.group(2)!;
+        final rawText = match.group(3) ?? '';
+
+        final startTime = _parseTtmlTime(beginStr);
+        final endTime = _parseTtmlTime(endStr);
+        final text = rawText
+            .replaceAll(RegExp(r'<[^>]+>'), '')
+            .replaceAll('&amp;', '&')
+            .replaceAll('&lt;', '<')
+            .replaceAll('&gt;', '>')
+            .replaceAll('&nbsp;', ' ')
+            .replaceAll('&#160;', ' ')
+            .trim();
+
+        if (text.isEmpty) continue;
+
+        items.add(SubtitleItem(
+          index: items.length + 1,
+          startTime: startTime,
+          endTime: endTime,
+          content: text,
+        ));
+      }
+    }
+
+    return items;
+  }
+
+  static Duration _parseTtmlTime(String timeStr) {
+    final hhmmssms = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})\.(\d{1,3})').firstMatch(timeStr);
+    if (hhmmssms != null) {
+      final hours = int.tryParse(hhmmssms.group(1)!) ?? 0;
+      final minutes = int.tryParse(hhmmssms.group(2)!) ?? 0;
+      final seconds = int.tryParse(hhmmssms.group(3)!) ?? 0;
+      var msStr = hhmmssms.group(4)!;
+      while (msStr.length < 3) {
+        msStr += '0';
+      }
+      final milliseconds = int.tryParse(msStr.substring(0, 3)) ?? 0;
+      return Duration(hours: hours, minutes: minutes, seconds: seconds, milliseconds: milliseconds);
+    }
+
+    final hhmmss = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})').firstMatch(timeStr);
+    if (hhmmss != null) {
+      return Duration(
+        hours: int.tryParse(hhmmss.group(1)!) ?? 0,
+        minutes: int.tryParse(hhmmss.group(2)!) ?? 0,
+        seconds: int.tryParse(hhmmss.group(3)!) ?? 0,
+      );
+    }
+
+    final secondsOnly = double.tryParse(timeStr);
+    if (secondsOnly != null) {
+      return Duration(milliseconds: (secondsOnly * 1000).round());
+    }
+
+    return Duration.zero;
+  }
+
+  static List<SubtitleItem> _parseSami(String content) {
+    final items = <SubtitleItem>[];
+    final syncRegex = RegExp(r'<SYNC\s+Start=(\d+)>', caseSensitive: false);
+    final allSyncs = <int>[];
+    final allTexts = <String>[];
+
+    for (final match in syncRegex.allMatches(content)) {
+      allSyncs.add(int.tryParse(match.group(1)!) ?? 0);
+      final afterSync = content.substring(match.end);
+      final nextSync = syncRegex.firstMatch(afterSync);
+      final block = nextSync != null ? afterSync.substring(0, nextSync.start) : afterSync;
+
+      final pMatch = RegExp(r'<P\b[^>]*>(.*?)(?=</P>|<SYNC|$)', caseSensitive: false, dotAll: true).firstMatch(block);
+      String text;
+      if (pMatch != null) {
+        text = pMatch.group(1)!;
+      } else {
+        final afterP = RegExp(r'<P\b[^>]*>', caseSensitive: false).firstMatch(block);
+        if (afterP != null) {
+          text = block.substring(afterP.end);
+        } else {
+          text = block;
+        }
+      }
+
+      text = text
+          .replaceAll(RegExp(r'<[^>]+>'), '')
+          .replaceAll('&amp;', '&')
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>')
+          .replaceAll('&nbsp;', ' ')
+          .replaceAll('&#160;', ' ')
+          .trim();
+
+      allTexts.add(text);
+    }
+
+    for (int i = 0; i < allSyncs.length; i++) {
+      final text = allTexts[i];
+      if (text.isEmpty) continue;
+
+      final startTime = Duration(milliseconds: allSyncs[i]);
+      final endTime = i + 1 < allSyncs.length
+          ? Duration(milliseconds: allSyncs[i + 1])
+          : startTime + const Duration(seconds: 3);
+
+      items.add(SubtitleItem(
+        index: items.length + 1,
+        startTime: startTime,
+        endTime: endTime,
+        content: text,
       ));
     }
 

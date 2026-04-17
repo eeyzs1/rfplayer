@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:video_player/video_player.dart';
-import 'package:fvp/fvp.dart' as fvp;
+import 'package:fvp/fvp.dart';
 import 'package:path/path.dart' as p;
 import '../../data/models/subtitle_track.dart';
 import '../models/subtitle_state.dart';
@@ -15,6 +16,7 @@ class SubtitleService {
   bool _hasExternalSubtitle = false;
   int _nextExternalId = 1000;
   bool _disposed = false;
+  final List<String> _tempSubtitleFiles = [];
 
   final _stateController = StreamController<SubtitleState>.broadcast();
   Stream<SubtitleState> get stateStream => _stateController.stream;
@@ -27,6 +29,19 @@ class SubtitleService {
   SubtitleTrack? get activeTrack => _activeTrack;
   bool get enabled => _enabled;
 
+  bool _renderingSetupDone = false;
+
+  void _ensureRenderingSetup() {
+    if (_renderingSetupDone) return;
+    _setupSubtitleRendering();
+    _renderingSetupDone = true;
+  }
+
+  void _setupSubtitleRendering() {
+    _videoController.setProperty('subtitle', '1');
+    _videoController.setProperty('cc', '1');
+  }
+
   SubtitleState get currentState => SubtitleState(
         tracks: List.unmodifiable(_tracks),
         activeTrack: _activeTrack,
@@ -36,15 +51,9 @@ class SubtitleService {
   Future<void> loadEmbeddedSubtitles() async {
     if (_disposed) return;
     try {
-      try {
-        _videoController.setProperty('subtitle', '1');
-        _videoController.setProperty('cc', '1');
-      } catch (e) {
-        debugPrint('[SubtitleService] Error setting subtitle properties: $e');
-      }
+      _ensureRenderingSetup();
 
       await Future.delayed(const Duration(milliseconds: 500));
-
       if (_disposed) return;
 
       final mediaInfo = _videoController.getMediaInfo();
@@ -67,31 +76,41 @@ class SubtitleService {
         _enabled = true;
 
         _videoController.setSubtitleTracks([0]);
+
         _notifyState();
       }
-    } catch (e) {
-      if (!_disposed) {
-        debugPrint('[SubtitleService] Error loading embedded subtitles: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   Future<void> loadExternalSubtitle(String subtitlePath) async {
     if (_disposed) return;
     try {
+      _ensureRenderingSetup();
+
+      final existingTrack = _tracks.where((t) => t.type == SubtitleTrackType.external).firstWhere(
+        (t) => t.path == subtitlePath,
+        orElse: () => SubtitleTrack(id: -1, name: '', type: SubtitleTrackType.external),
+      );
+      if (existingTrack.id != -1) {
+        await selectTrack(existingTrack);
+        return;
+      }
+
       final id = _nextExternalId++;
-      final name = p.basename(subtitlePath);
+      final fileName = p.basename(subtitlePath);
+      final nameWithoutExt = p.withoutExtension(fileName);
+      final displayName = '$nameWithoutExt [${p.extension(fileName).toUpperCase().replaceFirst('.', '')}]';
       final track = SubtitleTrack(
         id: id,
-        name: name,
+        name: displayName,
         type: SubtitleTrackType.external,
         path: subtitlePath,
       );
 
       _tracks.add(track);
+
       await selectTrack(track);
     } catch (e) {
-      if (!_disposed) debugPrint('[SubtitleService] Error loading subtitle: $e');
       rethrow;
     }
   }
@@ -103,9 +122,7 @@ class SubtitleService {
       _enabled = false;
       try {
         _videoController.setSubtitleTracks([]);
-      } catch (e) {
-        debugPrint('[SubtitleService] Error in setSubtitleTracks([]): $e');
-      }
+      } catch (_) {}
     } else {
       if (track.type == SubtitleTrackType.external) {
         await _selectExternalTrack(track);
@@ -118,21 +135,25 @@ class SubtitleService {
 
   Future<void> _selectExternalTrack(SubtitleTrack track) async {
     try {
-      _videoController.setExternalSubtitle(track.path!);
+      _clearExternalSubtitle();
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      final effectivePath = _resolveSubtitlePath(track.path!);
+
+      _videoController.setExternalSubtitle(effectivePath);
       _hasExternalSubtitle = true;
 
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (_disposed) return;
+      await Future.delayed(const Duration(milliseconds: 500));
 
       final embeddedCount =
           _tracks.where((t) => t.type == SubtitleTrackType.embedded).length;
+      
       _videoController.setSubtitleTracks([embeddedCount]);
 
       _activeTrack = track;
       _lastSelectedTrack = track;
       _enabled = true;
-    } catch (e) {
-      debugPrint('[SubtitleService] Error in setExternalSubtitle: $e');
+    } catch (_) {
       _activeTrack = track;
       _lastSelectedTrack = track;
       _enabled = true;
@@ -143,11 +164,11 @@ class SubtitleService {
     try {
       _clearExternalSubtitle();
       _videoController.setSubtitleTracks([track.id]);
+
       _activeTrack = track;
       _lastSelectedTrack = track;
       _enabled = true;
     } catch (e) {
-      debugPrint('[SubtitleService] Error in embedded subtitle selection: $e');
       _activeTrack = track;
       _lastSelectedTrack = track;
       _enabled = true;
@@ -179,11 +200,14 @@ class SubtitleService {
     if (trackToUse != null) {
       try {
         if (trackToUse.type == SubtitleTrackType.external) {
-          _videoController.setExternalSubtitle(trackToUse.path!);
+          _clearExternalSubtitle();
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          final effectivePath = _resolveSubtitlePath(trackToUse.path!);
+          _videoController.setExternalSubtitle(effectivePath);
           _hasExternalSubtitle = true;
 
-          await Future.delayed(const Duration(milliseconds: 300));
-          if (_disposed) return;
+          await Future.delayed(const Duration(milliseconds: 500));
 
           final embeddedCount =
               _tracks.where((t) => t.type == SubtitleTrackType.embedded).length;
@@ -192,10 +216,10 @@ class SubtitleService {
           _clearExternalSubtitle();
           _videoController.setSubtitleTracks([trackToUse.id]);
         }
+
         _enabled = true;
         _activeTrack = trackToUse;
       } catch (e) {
-        debugPrint('[SubtitleService] Error toggling on subtitle: $e');
         _enabled = true;
         _activeTrack = trackToUse;
       }
@@ -210,9 +234,7 @@ class SubtitleService {
 
     try {
       _videoController.setSubtitleTracks([]);
-    } catch (e) {
-      debugPrint('[SubtitleService] Error toggling off subtitle: $e');
-    }
+    } catch (_) {}
   }
 
   void removeTrack(SubtitleTrack track) {
@@ -225,14 +247,19 @@ class SubtitleService {
           _clearExternalSubtitle();
         }
 
-        final firstEmbedded = _tracks.firstWhere(
-          (t) => t.type == SubtitleTrackType.embedded,
-          orElse: () => _tracks.first,
-        );
+        if (_tracks.isEmpty) {
+          _activeTrack = null;
+          _enabled = false;
+        } else {
+          final firstEmbedded = _tracks.firstWhere(
+            (t) => t.type == SubtitleTrackType.embedded,
+            orElse: () => _tracks.first,
+          );
 
-        _activeTrack = firstEmbedded;
-        _enabled = true;
-        _videoController.setSubtitleTracks([firstEmbedded.id]);
+          _activeTrack = firstEmbedded;
+          _enabled = true;
+          _videoController.setSubtitleTracks([firstEmbedded.id]);
+        }
       }
       _notifyState();
     }
@@ -252,13 +279,18 @@ class SubtitleService {
     _clearExternalSubtitle();
 
     if (wasExternalActive) {
-      final firstEmbedded = _tracks.firstWhere(
-        (t) => t.type == SubtitleTrackType.embedded,
-        orElse: () => _tracks.first,
-      );
-      _activeTrack = firstEmbedded;
-      _enabled = true;
-      _videoController.setSubtitleTracks([firstEmbedded.id]);
+      if (_tracks.isEmpty) {
+        _activeTrack = null;
+        _enabled = false;
+      } else {
+        final firstEmbedded = _tracks.firstWhere(
+          (t) => t.type == SubtitleTrackType.embedded,
+          orElse: () => _tracks.first,
+        );
+        _activeTrack = firstEmbedded;
+        _enabled = true;
+        _videoController.setSubtitleTracks([firstEmbedded.id]);
+      }
     }
 
     _notifyState();
@@ -271,11 +303,10 @@ class SubtitleService {
 
     try {
       _videoController.setSubtitleTracks([]);
-    } catch (e) {
-      debugPrint('[SubtitleService] Error clearing current subtitle: $e');
-    }
+    } catch (_) {}
 
     _clearExternalSubtitle();
+
     _notifyState();
   }
 
@@ -286,12 +317,12 @@ class SubtitleService {
     _enabled = false;
 
     _clearExternalSubtitle();
+    _cleanupTempFiles();
 
     try {
       _videoController.setSubtitleTracks([]);
-    } catch (e) {
-      debugPrint('[SubtitleService] Error clearing subtitles: $e');
-    }
+    } catch (_) {}
+
     _notifyState();
   }
 
@@ -299,13 +330,141 @@ class SubtitleService {
       _hasExternalSubtitle &&
       _activeTrack?.type == SubtitleTrackType.external;
 
+  String _resolveSubtitlePath(String path) {
+    if (path.startsWith('content://')) {
+      return path;
+    }
+
+    final ext = p.extension(path).toLowerCase();
+    if (ext == '.sub') {
+      final idxPath = '${p.withoutExtension(path)}.idx';
+      final idxFile = File(idxPath);
+      if (idxFile.existsSync()) {
+        return idxPath;
+      }
+
+      if (_isMicroDvdFile(path)) {
+        final srtPath = _convertMicroDvdToSrt(path);
+        if (srtPath != null) {
+          return srtPath;
+        }
+      }
+    }
+
+    return path;
+  }
+
+  bool _isMicroDvdFile(String path) {
+    try {
+      final file = File(path);
+      final lines = file.readAsLinesSync();
+      for (final line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) continue;
+        return RegExp(r'^\{\d+\}\{\d+\}').hasMatch(trimmed);
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  String? _convertMicroDvdToSrt(String path) {
+    try {
+      final file = File(path);
+      final bytes = file.readAsBytesSync();
+      final content = _decodeSubtitleBytes(bytes);
+      final lines = content.split(RegExp(r'\r?\n'));
+      final srtBuffer = StringBuffer();
+      double fps = 23.976;
+      int index = 1;
+
+      for (final line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) continue;
+
+        final match = RegExp(r'^\{(\d+)\}\{(\d+)\}(.*)$').firstMatch(trimmed);
+        if (match == null) continue;
+
+        final startFrame = int.tryParse(match.group(1)!) ?? 0;
+        final endFrame = int.tryParse(match.group(2)!) ?? 0;
+        final text = match.group(3)?.trim() ?? '';
+
+        if (startFrame == 1 && endFrame == 1) {
+          final fpsValue = double.tryParse(text);
+          if (fpsValue != null && fpsValue > 0) {
+            fps = fpsValue;
+            continue;
+          }
+        }
+
+        if (text.isEmpty) continue;
+
+        final startTime = Duration(milliseconds: (startFrame / fps * 1000).round());
+        final endTime = Duration(milliseconds: (endFrame / fps * 1000).round());
+
+        srtBuffer.writeln(index);
+        srtBuffer.writeln('${_formatSrtTime(startTime)} --> ${_formatSrtTime(endTime)}');
+        srtBuffer.writeln(text.replaceAll('|', '\n'));
+        srtBuffer.writeln();
+        index++;
+      }
+
+      if (srtBuffer.isEmpty) return null;
+
+      final tempDir = Directory.systemTemp;
+      final tempFile = File('${tempDir.path}${Platform.pathSeparator}rfplayer_sub_${DateTime.now().millisecondsSinceEpoch}.srt');
+      tempFile.writeAsStringSync(srtBuffer.toString());
+      _tempSubtitleFiles.add(tempFile.path);
+
+      return tempFile.path;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static String _decodeSubtitleBytes(List<int> bytes) {
+    if (bytes.length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
+      return String.fromCharCodes(bytes.sublist(3));
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+      return String.fromCharCodes(bytes.sublist(2));
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+      return String.fromCharCodes(bytes.sublist(2));
+    }
+    try {
+      return String.fromCharCodes(bytes);
+    } catch (_) {
+      return String.fromCharCodes(bytes.where((b) => b < 128));
+    }
+  }
+
+  static String _formatSrtTime(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    final milliseconds = (duration.inMilliseconds % 1000).toString().padLeft(3, '0');
+    return '$hours:$minutes:$seconds,$milliseconds';
+  }
+
+  void _cleanupTempFiles() {
+    for (final tempPath in _tempSubtitleFiles) {
+      try {
+        final file = File(tempPath);
+        if (file.existsSync()) {
+          file.deleteSync();
+        }
+      } catch (_) {}
+    }
+    _tempSubtitleFiles.clear();
+  }
+
   void _clearExternalSubtitle() {
     if (_hasExternalSubtitle) {
       try {
         _videoController.setExternalSubtitle('');
-      } catch (e) {
-        debugPrint('[SubtitleService] Error clearing external subtitle: $e');
-      }
+      } catch (_) {}
       _hasExternalSubtitle = false;
     }
   }
@@ -317,7 +476,7 @@ class SubtitleService {
 
     if (metadata['language'] != null) {
       language = metadata['language']!;
-      name = _getLanguageName(language!);
+      name = _getLanguageName(language!, index);
     } else if (metadata['title'] != null) {
       name = metadata['title']!;
     } else {
@@ -332,8 +491,8 @@ class SubtitleService {
     );
   }
 
-  String _getLanguageName(String langCode) {
-    final langMap = {
+  String _getLanguageName(String langCode, [int? index]) {
+    const langMap = {
       'zh': '中文', 'chi': '中文', 'zho': '中文', 'cn': '中文',
       'en': 'English', 'eng': 'English',
       'ja': '日本語', 'jpn': '日本語',
@@ -346,7 +505,7 @@ class SubtitleService {
       'pt': 'Português', 'por': 'Português',
       'it': 'Italiano', 'ita': 'Italiano',
     };
-    return langMap[langCode.toLowerCase()] ?? 'Subtitle';
+    return langMap[langCode.toLowerCase()] ?? 'Subtitle ${index != null ? index + 1 : ''}'.trim();
   }
 
   void _notifyState() {
@@ -358,6 +517,7 @@ class SubtitleService {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _cleanupTempFiles();
     _stateController.close();
   }
 }

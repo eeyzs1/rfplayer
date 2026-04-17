@@ -51,21 +51,17 @@ class PermissionNotifier extends StateNotifier<PermissionState> {
       final androidInfo = await _deviceInfo.androidInfo;
       _isAndroid13Plus = androidInfo.version.sdkInt >= 33;
       return _isAndroid13Plus!;
-    } catch (e) {
-      debugPrint('[PermissionProvider] Error checking Android version: $e');
+    } catch (_) {
       _isAndroid13Plus = true;
       return true;
     }
   }
 
   Future<void> _checkInitialPermissions() async {
-    debugPrint('[PermissionProvider] ======== Checking initial permissions ========');
-
     PermissionStatus status;
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       if (await _isAndroid13OrHigher()) {
-        debugPrint('[PermissionProvider] Android 13+, checking READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO');
         final imageStatus = await Permission.photos.status;
         final videoStatus = await Permission.videos.status;
         final audioStatus = await Permission.audio.status;
@@ -80,7 +76,6 @@ class PermissionNotifier extends StateNotifier<PermissionState> {
           status = PermissionStatus.notDetermined;
         }
       } else {
-        debugPrint('[PermissionProvider] Android 12 and below, checking READ_EXTERNAL_STORAGE');
         final storageStatus = await Permission.storage.status;
 
         if (storageStatus.isGranted) {
@@ -97,21 +92,16 @@ class PermissionNotifier extends StateNotifier<PermissionState> {
       status = PermissionStatus.granted;
     }
 
-    debugPrint('[PermissionProvider] Initial permission status: $status');
-
     state = state.copyWith(storagePermission: status);
   }
 
   Future<bool> requestStoragePermission() async {
-    debugPrint('[PermissionProvider] ======== Requesting storage permission ========');
-
     state = state.copyWith(hasRequestedBefore: true);
 
     bool granted;
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       if (await _isAndroid13OrHigher()) {
-        debugPrint('[PermissionProvider] Android 13+, requesting READ_MEDIA_IMAGES, READ_MEDIA_VIDEO, READ_MEDIA_AUDIO');
         final results = await [
           Permission.photos,
           Permission.videos,
@@ -122,7 +112,6 @@ class PermissionNotifier extends StateNotifier<PermissionState> {
                   results[Permission.videos]?.isGranted == true &&
                   results[Permission.audio]?.isGranted == true;
       } else {
-        debugPrint('[PermissionProvider] Android 12 and below, requesting READ_EXTERNAL_STORAGE');
         final result = await Permission.storage.request();
         granted = result.isGranted;
       }
@@ -135,8 +124,6 @@ class PermissionNotifier extends StateNotifier<PermissionState> {
         : (await _isPermanentlyDenied()
             ? PermissionStatus.permanentlyDenied
             : PermissionStatus.denied);
-
-    debugPrint('[PermissionProvider] Request result: granted=$granted, status=$newStatus');
 
     state = state.copyWith(storagePermission: newStatus);
     return granted;
@@ -158,12 +145,10 @@ class PermissionNotifier extends StateNotifier<PermissionState> {
   }
 
   Future<void> openAppSettingsPage() async {
-    debugPrint('[PermissionProvider] Opening app settings');
     await openAppSettings();
   }
 
   Future<void> refreshPermissionStatus() async {
-    debugPrint('[PermissionProvider] Refreshing permission status');
     _isAndroid13Plus = null;
     await _checkInitialPermissions();
   }

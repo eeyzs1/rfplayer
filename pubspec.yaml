@@ -61,6 +61,7 @@ dependencies:
   saf_stream: ^2.0.0
   device_info_plus: ^12.4.0
   package_info_plus: ^9.0.1
+  logging: ^1.2.0
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +78,10 @@ dev_dependencies:
   freezed: ^2.5.8
   json_serializable: ^6.9.5
   riverpod_generator: ^2.6.4
+
+dependency_overrides:
+  fvp:
+    path: packages/fvp
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

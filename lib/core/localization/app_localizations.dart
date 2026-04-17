@@ -106,9 +106,8 @@ class AppLocalizations {
   String get sureToClearAll => localizedStrings['sureToClearAll']!;
 
   // 功能选择
-  String get playVideo => localizedStrings['playVideo']!;
+  String get playMedia => localizedStrings['playMedia']!;
   String get viewImage => localizedStrings['viewImage']!;
-  String get playAudio => localizedStrings['playAudio']!;
   
   // 播放列表
   String get playList => localizedStrings['playList']!;
@@ -128,9 +127,8 @@ class AppLocalizations {
   String get deleted => localizedStrings['deleted']!;
   
   // 功能卡片描述
-  String get playVideoDesc => localizedStrings['playVideoDesc']!;
+  String get playMediaDesc => localizedStrings['playMediaDesc']!;
   String get viewImageDesc => localizedStrings['viewImageDesc']!;
-  String get playAudioDesc => localizedStrings['playAudioDesc']!;
   
   // 书签页面
   String get imageBookmarks => localizedStrings['imageBookmarks']!;

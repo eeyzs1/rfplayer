@@ -92,4 +92,63 @@ class FileUtils {
     });
     return entries;
   }
+
+  static List<String> buildMimeTypes(List<String> extensions) {
+    final categories = <String>{};
+    for (final ext in extensions) {
+      final category = _extensionToCategory[ext];
+      if (category != null) {
+        categories.add(category);
+      }
+    }
+    if (categories.isEmpty) return ['*/*'];
+    return categories.toList();
+  }
+
+  static const _extensionToCategory = <String, String>{
+    'mp4': 'video/*',
+    'mkv': 'video/*',
+    'avi': 'video/*',
+    'mov': 'video/*',
+    'wmv': 'video/*',
+    'flv': 'video/*',
+    'webm': 'video/*',
+    '3gp': 'video/*',
+    'm4v': 'video/*',
+    'mpg': 'video/*',
+    'mpeg': 'video/*',
+    'rmvb': 'video/*',
+    'ts': 'video/*',
+    'vob': 'video/*',
+    'ogv': 'video/*',
+    'jpg': 'image/*',
+    'jpeg': 'image/*',
+    'png': 'image/*',
+    'gif': 'image/*',
+    'bmp': 'image/*',
+    'webp': 'image/*',
+    'svg': 'image/*',
+    'tiff': 'image/*',
+    'tif': 'image/*',
+    'ico': 'image/*',
+    'mp3': 'audio/*',
+    'wav': 'audio/*',
+    'flac': 'audio/*',
+    'aac': 'audio/*',
+    'ogg': 'audio/*',
+    'wma': 'audio/*',
+    'm4a': 'audio/*',
+    'opus': 'audio/*',
+    'ape': 'audio/*',
+    'alac': 'audio/*',
+    'srt': 'application/x-subrip',
+    'ass': 'text/x-ssa',
+    'ssa': 'text/x-ssa',
+    'vtt': 'text/vtt',
+    'sub': 'text/plain',
+    'dfxp': 'application/ttml+xml',
+    'ttml': 'application/ttml+xml',
+    'smi': 'application/smil',
+    'idx': 'text/plain',
+  };
 }

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/models/app_settings.dart';
@@ -20,9 +19,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     try {
       final settings = await _ref.read(settingsRepositoryProvider).load();
       state = settings;
-    } catch (e) {
-      debugPrint('[SettingsNotifier] Failed to load settings: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> update(AppSettings settings) async {
@@ -30,8 +27,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     try {
       await _ref.read(settingsRepositoryProvider).save(settings);
       state = settings;
-    } catch (e) {
-      debugPrint('[SettingsNotifier] Failed to save settings: $e');
+    } catch (_) {
       state = previousState;
     }
   }

@@ -32,10 +32,6 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
   @override
   void initState() {
     super.initState();
-    debugPrint('[ImageViewerPage] ======== 图片查看器初始化 ========');
-    debugPrint('[ImageViewerPage] path: ${widget.path}');
-    debugPrint('[ImageViewerPage] fileName: ${widget.fileName}');
-    debugPrint('[ImageViewerPage] bytes: ${widget.bytes != null ? '有数据，长度: ${widget.bytes!.length}' : '无数据'}');
     _updateHistory();
   }
   
@@ -56,11 +52,7 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
       } else {
         historyPath = playbackPath;
       }
-      
-      debugPrint('[ImageViewerPage] 原路径: ${widget.path}');
-      debugPrint('[ImageViewerPage] 安全路径: $playbackPath');
-      debugPrint('[ImageViewerPage] 历史路径: $historyPath');
-      
+
       final historyRepo = ref.read(historyRepositoryProvider);
       var history = await historyRepo.getByPath(historyPath);
       
@@ -107,9 +99,7 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
           _generateThumbnailAsync();
         }
       }
-    } catch (e) {
-      debugPrint('[ImageViewerPage] 更新历史记录失败: $e');
-    }
+    } catch (_) {}
   }
   
   Future<void> _generateThumbnailAsync() async {
@@ -151,9 +141,7 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
           await historyRepo.upsert(updatedHistory);
         }
       }
-    } catch (e) {
-      debugPrint('[ImageViewerPage] 生成缩略图失败: $e');
-    }
+    } catch (_) {}
   }
 
   @override

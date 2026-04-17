@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:logging/logging.dart';
 import 'app.dart';
 import 'package:fvp/fvp.dart' as fvp;
 import 'presentation/providers/play_queue_provider.dart';
@@ -9,14 +12,64 @@ import 'presentation/providers/permission_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化 fvp 库，启用字幕渲染和相关属性
-  fvp.registerWith(options: {
-    // 确保字幕渲染是启用的
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    debugPrint(
+        '${record.loggerName}.${record.level.name}: ${record.time}: ${record.message}',
+        wrapWidth: 0x7FFFFFFFFFFFFFFF);
+  });
+
+  String? subtitleFontFile;
+  String? subtitleFontsDir;
+  if (Platform.isAndroid) {
+    final appDir = await getApplicationSupportDirectory();
+    final mdkFontsDir = '${appDir.path}/mdk';
+    final mdkFontsDirFile = Directory(mdkFontsDir);
+    if (!mdkFontsDirFile.existsSync()) {
+      mdkFontsDirFile.createSync(recursive: true);
+    }
+
+    const sourceFonts = [
+      '/system/fonts/NotoSansCJK-Regular.ttc',
+      '/system/fonts/NotoSansSC-Regular.otf',
+      '/system/fonts/NotoSansCJKsc-Regular.otf',
+      '/system/fonts/Roboto-Regular.ttf',
+    ];
+
+    for (final srcPath in sourceFonts) {
+      final srcFile = File(srcPath);
+      if (!srcFile.existsSync()) continue;
+
+      final fileName = srcPath.split('/').last;
+      final destPath = '$mdkFontsDir/$fileName';
+      final destFile = File(destPath);
+
+      if (!destFile.existsSync()) {
+        try {
+          await srcFile.copy(destPath);
+        } catch (_) {
+          continue;
+        }
+      }
+
+      subtitleFontFile ??= destPath;
+    }
+
+    subtitleFontsDir = mdkFontsDir;
+  }
+
+  final fvpOptions = <String, dynamic>{
     'player': {
       'subtitle': '1',
       'cc': '1',
     },
-  });
+    'subtitleFontFile': ?subtitleFontFile,
+    'global': {
+      'subtitle.fonts.dir': ?subtitleFontsDir,
+    },
+  };
+
+  fvp.registerWith(options: fvpOptions);
 
   runApp(const ProviderScope(child: AppInitializer()));
 }
@@ -39,28 +92,21 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
 
   Future<void> _initializeApp() async {
     try {
-      // 清理播放队列中的无效记录
       final playQueueNotifier = ref.read(playQueueProvider.notifier);
       await playQueueNotifier.cleanupInvalidItems();
 
-      // 清理历史记录中的无效记录
       final historyActions = ref.read(historyActionsProvider);
       await historyActions.cleanupInvalidRecords();
-      
-      // 等待权限 provider 初始化并检查状态
+
       await Future.delayed(const Duration(milliseconds: 100));
-      
-      // 如果之前没有请求过权限，现在请求
+
       final permissionState = ref.read(permissionProvider);
-      if (!permissionState.hasRequestedBefore && 
+      if (!permissionState.hasRequestedBefore &&
           permissionState.storagePermission == PermissionStatus.notDetermined) {
-        debugPrint('[AppInitializer] 首次启动，请求存储权限...');
         final permissionNotifier = ref.read(permissionProvider.notifier);
         await permissionNotifier.requestStoragePermission();
       }
-    } catch (e) {
-      debugPrint('Error initializing app: $e');
-    } finally {
+    } catch (_) {} finally {
       if (mounted) {
         setState(() {
           _isInitialized = true;

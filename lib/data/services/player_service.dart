@@ -16,20 +16,14 @@ class PlayerService extends ChangeNotifier {
     required Future<void> Function(String safePath, String? fileName, String originalPath) onCreateController,
     required void Function() onDisposeController,
   }) async {
-    if (_isInitializing) {
-      debugPrint('[PlayerService] initialize already in progress, skipping');
-      return;
-    }
+    if (_isInitializing) return;
     _isInitializing = true;
 
     try {
       _disposeController();
 
       final pathToUse = await RealPathUtils.getSafePath(path);
-      if (pathToUse == null) {
-        debugPrint('[PlayerService] Error: Could not get safe path for: $path');
-        return;
-      }
+      if (pathToUse == null) return;
 
       await onCreateController(pathToUse, fileName, path);
 
@@ -76,16 +70,8 @@ class PlayerService extends ChangeNotifier {
 
   void _disposeController() {
     if (_controller != null) {
-      try {
-        _controller!.pause();
-      } catch (e) {
-        debugPrint('[PlayerService] Error pausing controller: $e');
-      }
-      try {
-        _controller!.dispose();
-      } catch (e) {
-        debugPrint('[PlayerService] Error disposing controller: $e');
-      }
+      try { _controller!.pause(); } catch (_) {}
+      try { _controller!.dispose(); } catch (_) {}
       _controller = null;
     }
     _isInitialized = false;

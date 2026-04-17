@@ -79,9 +79,8 @@ const Map<String, String> enUS = {
   'sureToClearAll': 'Are you sure you want to clear all history?',
 
   // 功能选择
-  'playVideo': 'Play Video',
+  'playMedia': 'Play Video/Audio',
   'viewImage': 'View Image',
-  'playAudio': 'Play Audio',
   
   // 播放列表
   'playList': 'Playlist',
@@ -101,9 +100,8 @@ const Map<String, String> enUS = {
   'deleted': 'Deleted',
   
   // 功能卡片描述
-  'playVideoDesc': 'Select and play local video files',
+  'playMediaDesc': 'Select and play local video or audio files',
   'viewImageDesc': 'Select and view local image files',
-  'playAudioDesc': 'Select and play local audio files',
   
   // 书签页面
   'imageBookmarks': 'Image Bookmarks',

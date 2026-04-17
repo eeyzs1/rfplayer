@@ -1,6 +1,6 @@
 enum SubtitleTrackType {
-  embedded, // 内置字幕轨道
-  external, // 外部字幕文件
+  embedded,
+  external,
 }
 
 class SubtitleTrack {
@@ -8,7 +8,8 @@ class SubtitleTrack {
   final String name;
   final String? language;
   final SubtitleTrackType type;
-  final String? path; // 仅外部字幕文件使用
+  final String? path;
+  final int? streamIndex;
 
   SubtitleTrack({
     required this.id,
@@ -16,10 +17,11 @@ class SubtitleTrack {
     this.language,
     required this.type,
     this.path,
+    this.streamIndex,
   });
 
   @override
   String toString() {
-    return 'SubtitleTrack(id: $id, name: $name, language: $language, type: $type, path: $path)';
+    return 'SubtitleTrack(id: $id, name: $name, language: $language, type: $type, streamIndex: $streamIndex)';
   }
 }

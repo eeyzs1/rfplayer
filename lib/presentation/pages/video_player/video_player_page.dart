@@ -5,16 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
-import 'package:fast_file_picker/fast_file_picker.dart';
-import 'package:file_selector/file_selector.dart';
 import '../../../core/utils/toast_utils.dart';
 import '../../../core/utils/real_path_utils.dart';
+import '../../../core/utils/file_utils.dart';
 import '../../../core/localization/app_localizations.dart';
-import '../../../core/constants/supported_formats.dart';
 import '../../../data/models/subtitle_track.dart';
 import '../../../data/models/play_queue.dart';
 
 import 'speed_control.dart';
+import 'package:fast_file_picker/fast_file_picker.dart';
+import 'package:file_selector/file_selector.dart';
+
 import '../../../presentation/providers/database_provider.dart';
 import '../../../presentation/providers/settings_provider.dart';
 import '../../../presentation/providers/play_queue_provider.dart';
@@ -72,6 +73,8 @@ class _SubtitleMenuState extends ConsumerState<SubtitleMenu> {
         ? (isLandscape ? 180.0 : 160.0) 
         : 240.0;
     
+    final menuHPadding = Platform.isAndroid && isLandscape ? 8.0 : 16.0;
+    
     return Container(
       constraints: BoxConstraints(
         maxHeight: menuMaxHeight,
@@ -94,7 +97,7 @@ class _SubtitleMenuState extends ConsumerState<SubtitleMenu> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
               Container(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: EdgeInsets.fromLTRB(menuHPadding, 16, menuHPadding, 8),
                 decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: Colors.grey[800]!)),
                 ),
@@ -127,6 +130,7 @@ class _SubtitleMenuState extends ConsumerState<SubtitleMenu> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           ListTile(
+                            contentPadding: EdgeInsets.only(left: menuHPadding, right: menuHPadding),
                             leading: const Icon(Icons.add_circle_outline, color: Colors.white, size: 20),
                             title: Text(
                               loc.selectSubtitleFile,
@@ -143,7 +147,7 @@ class _SubtitleMenuState extends ConsumerState<SubtitleMenu> {
                           
                           if (hasSubtitle) ...[
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                              padding: EdgeInsets.fromLTRB(menuHPadding, 12, menuHPadding, 8),
                               child: Text(
                                 loc.selectSubtitle,
                                 style: TextStyle(
@@ -155,37 +159,36 @@ class _SubtitleMenuState extends ConsumerState<SubtitleMenu> {
                             ...subtitleTracks.map((track) {
                               final isActive = activeTrack?.id == track.id && subtitleEnabled;
                               return ListTile(
+                                contentPadding: EdgeInsets.only(left: menuHPadding, right: 0, top: 0, bottom: 0),
+                                minLeadingWidth: 24,
                                 leading: Icon(
                                   isActive ? Icons.check_circle : Icons.radio_button_unchecked,
                                   color: isActive ? Colors.blue : Colors.grey[400],
-                                  size: 20,
+                                  size: Platform.isAndroid ? 18 : 20,
                                 ),
                                 title: Text(
                                   track.name,
                                   style: TextStyle(
                                     color: isActive ? Colors.blue : Colors.white,
                                     fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                                    fontSize: Platform.isAndroid ? 12 : 16,
+                                    fontSize: Platform.isAndroid ? 13 : 16,
+                                    height: 1.4,
                                   ),
-                                ),
-                                subtitle: Text(
-                                  track.type == SubtitleTrackType.external 
-                                      ? loc.externalSubtitle 
-                                      : loc.embeddedSubtitle,
-                                  style: TextStyle(
-                                    color: Colors.grey[500],
-                                    fontSize: Platform.isAndroid ? 10 : 14,
-                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 trailing: track.type == SubtitleTrackType.external
-                                    ? IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Colors.grey),
-                                        iconSize: 20,
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                        onPressed: () {
-                                          widget.onRemoveSubtitle(track);
-                                        },
+                                    ? Transform.translate(
+                                        offset: const Offset(8, 0),
+                                        child: IconButton(
+                                          icon: const Icon(Icons.delete_outline, color: Colors.grey),
+                                          iconSize: Platform.isAndroid ? 19 : 24,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          onPressed: () {
+                                            widget.onRemoveSubtitle(track);
+                                          },
+                                        ),
                                       )
                                     : null,
                                 onTap: () {
@@ -197,6 +200,7 @@ class _SubtitleMenuState extends ConsumerState<SubtitleMenu> {
                           ],
                           
                           ListTile(
+                            contentPadding: EdgeInsets.only(left: menuHPadding, right: menuHPadding),
                             leading: Icon(
                               subtitleEnabled ? Icons.visibility : Icons.visibility_off,
                               color: Colors.white,
@@ -217,6 +221,7 @@ class _SubtitleMenuState extends ConsumerState<SubtitleMenu> {
                           
                           if (hasSubtitle) ...[
                             ListTile(
+                              contentPadding: EdgeInsets.only(left: menuHPadding, right: menuHPadding),
                               leading: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                               title: Text(
                                 // 如果有外挂字幕，显示删除所有字幕文件；否则显示不显示字幕
@@ -402,27 +407,12 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
 
   // 智能路径比较方法，处理 content:// URI 和真实文件路径的区别
   bool _pathsMatch(String path1, String path2) {
-    debugPrint('[VideoPlayerPage] Comparing paths: path1=$path1, path2=$path2');
-    
-    // 完全相同的路径
-    if (path1 == path2) {
-      debugPrint('[VideoPlayerPage] Paths match exactly');
-      return true;
-    }
-    
-    // 使用 RealPathUtils 获取文件名进行比较
+    if (path1 == path2) return true;
+
     final name1 = RealPathUtils.getFileName(path1);
     final name2 = RealPathUtils.getFileName(path2);
-    
-    debugPrint('[VideoPlayerPage] Extracted names: name1=$name1, name2=$name2');
-    
-    if (name1 == name2) {
-      debugPrint('[VideoPlayerPage] Paths match by filename');
-      return true;
-    }
-    
-    debugPrint('[VideoPlayerPage] Paths do not match');
-    return false;
+
+    return name1 == name2;
   }
 
   // 获取缓存的字幕菜单，只创建一次
@@ -484,7 +474,6 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
 
   @override
   void dispose() {
-    debugPrint('[VideoPlayerPage] dispose called');
     _isDisposing = true;
     _playQueueSubscription?.close();
     _playQueueSubscription = null;
@@ -528,18 +517,14 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
             await playQueueService.updatePlayProgress(currentPlaying.id, progress);
           }
         }
-      } catch (e) {
-        debugPrint('Error updating data on back press: $e');
-      }
+      } catch (_) {}
     }
 
     final controller = playerService.controller;
     if (controller != null && controller is MyVideoPlayerController) {
       try {
         controller.dispose();
-      } catch (e) {
-        debugPrint('[VideoPlayerPage] Error disposing MyVideoPlayerController: $e');
-      }
+      } catch (_) {}
     }
     playerService.stopAndRelease();
 
@@ -549,38 +534,23 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
 
   // 处理播放队列变化
   Future<void> _handlePlayQueueChange() async {
-    debugPrint('[VideoPlayerPage] ======== _handlePlayQueueChange() CALLED ========');
-    debugPrint('[VideoPlayerPage] mounted=$mounted, _isDisposing=$_isDisposing, _isInitializing=$_isInitializing');
-    
-    if (!mounted || _isDisposing || _isInitializing) {
-      debugPrint('[VideoPlayerPage] _handlePlayQueueChange() SKIPPING - not mounted, disposing, or initializing');
-      return;
-    }
-    
+    if (!mounted || _isDisposing || _isInitializing) return;
+
     try {
       final playQueueService = ref.read(playQueueServiceProvider);
       final currentPlaying = await playQueueService.getCurrentPlaying();
-      
-      if (!mounted || _isDisposing || currentPlaying == null) {
-        return;
-      }
-      
+
+      if (!mounted || _isDisposing || currentPlaying == null) return;
+
       final playerService = ref.read(playerServiceProvider);
       final currentPath = playerService.currentPath;
-      
-      // 1. 检查路径是否相同
+
       if (currentPath == currentPlaying.path) {
-        // 2. 如果相同，播放
-        debugPrint('[VideoPlayerPage] _handlePlayQueueChange: Same path, just playing');
         if (playerService.isInitialized) {
           playerService.play();
-          if (mounted) {
-            _startListeningToPlayer();
-          }
+          if (mounted) _startListeningToPlayer();
         }
       } else {
-        // 3. 如果不同，加入列表 + 播放
-        debugPrint('[VideoPlayerPage] _handlePlayQueueChange: Different path, adding to queue and playing');
         final newFileName = currentPlaying.displayName;
         await playerService.initialize(
           currentPlaying.path,
@@ -630,37 +600,23 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
           _startListeningToPlayer();
         }
       }
-    } catch (e, stackTrace) {
-      debugPrint('Error handling play queue change: $e');
-      debugPrint('Stack trace: $stackTrace');
-    }
+    } catch (_) {}
   }
 
   Future<void> _initializePlayer() async {
-    debugPrint('[VideoPlayerPage] ======== _initializePlayer() CALLED ========');
-    if (!mounted) {
-      debugPrint('[VideoPlayerPage] _initializePlayer() SKIPPING - not mounted');
-      return;
-    }
-    
-    // 设置初始化标志，防止 _handlePlayQueueChange 在初始化过程中被触发
-    setState(() {
-      _isInitializing = true;
-    });
-    
-    debugPrint('[VideoPlayerPage] ======== 开始初始化播放器 ========');
-    
+    if (!mounted) return;
+
+    setState(() { _isInitializing = true; });
+
     try {
       final settings = ref.read(settingsProvider);
       _playbackSpeed = settings.defaultPlaybackSpeed;
 
-      // 1. 添加到播放队列
       final playQueueNotifier = ref.read(playQueueProvider.notifier);
       final playQueueService = ref.read(playQueueServiceProvider);
       final fileName = widget.fileName ?? p.basename(widget.path);
       await playQueueNotifier.addToQueue(widget.path, fileName);
-      
-      // 2. 找到刚添加的项目并设置为当前播放
+
       final queue = await playQueueService.getQueue();
       PlayQueueItem? itemToPlay;
       for (final item in queue) {
@@ -669,16 +625,12 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
           break;
         }
       }
-      
+
       if (itemToPlay != null) {
-        // 将我们要播放的项设置为当前播放项目
-        debugPrint('[VideoPlayerPage] Setting item as current playing: ${itemToPlay.displayName}');
         await playQueueNotifier.playItem(itemToPlay.id);
       }
-      
-      // 3. 初始化播放器，但不播放
+
       final playerService = ref.read(playerServiceProvider);
-      debugPrint('[VideoPlayerPage] _initializePlayer: initializing with fileName: $fileName (but NOT playing yet)');
       await playerService.initialize(
         widget.path,
         fileName: fileName,
@@ -726,17 +678,13 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
       }
       
       // 4. 开始播放
-      debugPrint('[VideoPlayerPage] _initializePlayer: starting playback');
       playerService.play();
       
       // 更新 UI
       if (mounted) {
         _startListeningToPlayer();
       }
-    } catch (e, stackTrace) {
-      debugPrint('Error initializing player: $e');
-      debugPrint('Stack trace: $stackTrace');
-    } finally {
+    } catch (_) {} finally {
       // 清除初始化标志
       if (mounted) {
         setState(() {
@@ -774,9 +722,7 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
               _isCompleted = completed;
             });
           }
-        } catch (e) {
-          debugPrint('Error getting player state: $e');
-        }
+        } catch (_) {}
       }
     };
     playerService.addListener(_playerServiceListener!);
@@ -994,9 +940,7 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
       await ref.read(settingsProvider.notifier).update(
             settings.copyWith(defaultPlaybackSpeed: speed),
           );
-    } catch (e) {
-      debugPrint('Error saving playback speed: $e');
-    }
+    } catch (_) {}
   }
 
   // ── 音量回调 ─────────────────────────────────────────────────
@@ -1039,8 +983,7 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
     final loc = AppLocalizations.of(context)!;
     final playerService = ref.read(playerServiceProvider);
     if (!playerService.isInitialized || playerService.controller == null) return;
-    
-    // 暂停视频
+
     final wasPlaying = _isPlaying;
     if (_isPlaying) {
       playerService.pause();
@@ -1048,29 +991,68 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
     }
 
     try {
-      // 打开文件选择器
-      final typeGroup = XTypeGroup(
+      const subtitleExtensions = ['srt', 'ass', 'ssa', 'vtt', 'sub', 'dfxp', 'ttml', 'smi', 'idx'];
+      final subtitleTypeGroup = XTypeGroup(
         label: 'Subtitle Files',
-        extensions: subtitleFormats.toList(),
+        extensions: subtitleExtensions,
+        mimeTypes: Platform.isAndroid ? FileUtils.buildMimeTypes(subtitleExtensions) : null,
       );
       final result = await FastFilePicker.pickFile(
-        acceptedTypeGroups: [typeGroup],
+        acceptedTypeGroups: [subtitleTypeGroup],
       );
 
-      if (result != null) {
-        String? subtitlePath;
-        if (result.path != null) {
-          subtitlePath = result.path;
-        } else if (result.uri != null) {
-          subtitlePath = result.uri.toString();
-        }
+      if (result == null) return;
+
+      String? subtitlePath;
+
+      if (result.path != null) {
+        subtitlePath = result.path;
+      } else if (result.uri != null) {
+        final contentUri = result.uri.toString();
+        final settings = ref.read(settingsProvider);
         
-        if (subtitlePath != null) {
-          // 加载字幕
-          await playerService.controller!.loadSubtitle(subtitlePath);
-          if (mounted) {
-            ToastUtils.showToast(context, loc.subtitleAdded);
+        if (settings.historySaveMode == HistorySaveMode.virtualPath && Platform.isAndroid) {
+          await RealPathUtils.takePersistableUriPermission(contentUri);
+        }
+
+        if (Platform.isAndroid) {
+          try {
+            var ext = p.extension(result.name).toLowerCase();
+            if (ext.isEmpty) {
+              ext = p.extension(Uri.parse(contentUri).path).toLowerCase();
+            }
+            final cachedPath = await const MethodChannel('fvp').invokeMethod<String>('CopyContentUri', {
+              'uri': contentUri,
+              'ext': ext,
+            });
+            if (cachedPath != null) {
+              subtitlePath = cachedPath;
+            }
+          } catch (_) {}
+        }
+
+        if (subtitlePath == null) {
+          final realPath = await RealPathUtils.getSafePath(contentUri);
+          if (realPath != null) {
+            subtitlePath = realPath;
           }
+        }
+
+        if (subtitlePath == null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('无法访问该字幕文件'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+      }
+
+      if (subtitlePath != null) {
+        await playerService.controller!.loadSubtitle(subtitlePath);
+        if (mounted) {
+          ToastUtils.showToast(context, loc.subtitleAdded);
         }
       }
     } catch (e) {
@@ -1078,7 +1060,6 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
         ToastUtils.showToast(context, loc.addSubtitleFailed);
       }
     } finally {
-      // 如果之前是播放状态，恢复播放
       if (wasPlaying && mounted) {
         playerService.play();
         setState(() { _isPlaying = true; });
@@ -1130,12 +1111,9 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
     final controller = playerService.controller;
     final subtitleTracks = controller?.subtitleTracks ?? [];
     _queueSubtitleOperation(() async {
-      // 检查是否有外挂字幕
       if (subtitleTracks.any((t) => t.type == SubtitleTrackType.external)) {
-        // 删除所有外挂字幕
         controller?.removeAllSubtitleTracks();
       } else {
-        // 对于内置字幕，只是不显示
         controller?.clearCurrentSubtitle();
       }
     });
@@ -1670,18 +1648,22 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
                             }
                           },
                           child: SizedBox.expand(
-                            child: Consumer(
-                              builder: (context, ref, child) {
-                                final playerService = ref.watch(playerServiceProvider);
-                                if (playerService.isInitialized && 
-                                    playerService.controller != null) {
-                                  return VideoPlayer(playerService.controller!.videoController);
-                                } else {
-                                  return const Center(
-                                    child: CircularProgressIndicator(color: Colors.blue),
-                                  );
-                                }
-                              },
+                            child: Stack(
+                              children: [
+                                Consumer(
+                                  builder: (context, ref, child) {
+                                    final playerService = ref.watch(playerServiceProvider);
+                                    if (playerService.isInitialized && 
+                                        playerService.controller != null) {
+                                      return VideoPlayer(playerService.controller!.videoController);
+                                    } else {
+                                      return const Center(
+                                        child: CircularProgressIndicator(color: Colors.blue),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -2029,3 +2011,4 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
     );
   }
 }
+

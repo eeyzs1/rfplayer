@@ -12,7 +12,7 @@ const Set<String> audioFormats = {
 };
 
 const Set<String> subtitleFormats = {
-  'srt', 'ass', 'ssa', 'vtt', 'sub', 'dfxp',
+  'srt', 'ass', 'ssa', 'vtt', 'sub', 'dfxp', 'ttml', 'smi', 'idx',
 };
 
 bool isVideoFile(String path) {

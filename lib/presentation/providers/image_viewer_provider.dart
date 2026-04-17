@@ -123,7 +123,6 @@ class ImageViewerNotifier extends StateNotifier<ImageViewerState> {
     // 先确保使用真实路径
     final realPath = await _ensureRealPath(state.currentPath);
     if (realPath != state.currentPath) {
-      debugPrint('[ImageViewerProvider] 转换路径为真实路径: $realPath');
       state = state.copyWith(
         currentPath: realPath,
         imagePaths: [realPath],
@@ -225,10 +224,7 @@ class ImageViewerNotifier extends StateNotifier<ImageViewerState> {
           format: format,
         ),
       );
-    } catch (e, stackTrace) {
-      debugPrint('[ImageViewerProvider] Failed to load image info: $e');
-      debugPrint('[ImageViewerProvider] Stack trace: $stackTrace');
-    }
+    } catch (_) {}
   }
 
   void toggleUIVisibility() {

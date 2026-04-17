@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../../data/models/play_history.dart';
 import '../../data/models/app_settings.dart';
@@ -147,11 +146,7 @@ class PlaybackHistoryService {
     if (_disposed) return;
     try {
       await _repository.updatePosition(path, position);
-    } catch (e) {
-      if (!_disposed) {
-        debugPrint('[PlaybackHistoryService] Error updating position: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   void updatePositionDebounced(String path, Duration position) {
@@ -187,11 +182,7 @@ class PlaybackHistoryService {
           await _repository.upsert(updatedHistory);
         }
       }
-    } catch (e) {
-      if (!_disposed) {
-        debugPrint('[PlaybackHistoryService] Error updating duration: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   void _generateThumbnailAsync(String path, {MediaType? type}) async {
@@ -220,11 +211,7 @@ class PlaybackHistoryService {
           await _repository.upsert(updatedHistory);
         }
       }
-    } catch (e) {
-      if (!_disposed) {
-        debugPrint('[PlaybackHistoryService] Thumbnail generation failed: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   String _extractExtension(String filename) {
@@ -233,15 +220,9 @@ class PlaybackHistoryService {
   }
 
   MediaType _detectMediaType(String extension) {
-    if (videoFormats.contains(extension)) {
-      return MediaType.video;
-    }
-    if (audioFormats.contains(extension)) {
-      return MediaType.audio;
-    }
-    if (imageFormats.contains(extension)) {
-      return MediaType.image;
-    }
+    if (videoFormats.contains(extension)) return MediaType.video;
+    if (audioFormats.contains(extension)) return MediaType.audio;
+    if (imageFormats.contains(extension)) return MediaType.image;
     return MediaType.video;
   }
 

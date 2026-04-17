@@ -28,11 +28,11 @@ class HomePage extends ConsumerWidget {
               ),
               delegate: SliverChildListDelegate([
                 FeatureCard(
-                  icon: Icons.video_library,
-                  title: loc.playVideo,
-                  description: loc.playVideoDesc,
+                  icon: Icons.play_circle,
+                  title: loc.playMedia,
+                  description: loc.playMediaDesc,
                   route: '/video-player',
-                  allowedExtensions: videoFormats.toList(),
+                  allowedExtensions: {...videoFormats, ...audioFormats}.toList(),
                 ),
                 FeatureCard(
                   icon: Icons.photo_library,
@@ -40,13 +40,6 @@ class HomePage extends ConsumerWidget {
                   description: loc.viewImageDesc,
                   route: '/image-viewer',
                   allowedExtensions: imageFormats.toList(),
-                ),
-                FeatureCard(
-                  icon: Icons.audio_file,
-                  title: loc.playAudio,
-                  description: loc.playAudioDesc,
-                  route: '/audio-player',
-                  allowedExtensions: audioFormats.toList(),
                 ),
               ]),
             ),

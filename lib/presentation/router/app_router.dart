@@ -9,7 +9,6 @@ import '../pages/bookmark/bookmark_page.dart';
 import '../pages/settings/settings_page.dart';
 import '../pages/video_player/video_player_page.dart';
 import '../pages/image_viewer/image_viewer_page.dart';
-import '../pages/audio_player/audio_player_page.dart';
 
 class VideoPlayerRouteExtra {
   final String path;
@@ -27,15 +26,6 @@ class ImageViewerRouteExtra {
   final String? originalContentUri;
 
   const ImageViewerRouteExtra({required this.path, this.name, this.bytes, this.originalContentUri});
-}
-
-class AudioPlayerRouteExtra {
-  final String path;
-  final String? name;
-  final Duration? position;
-  final String? originalContentUri;
-
-  const AudioPlayerRouteExtra({required this.path, this.name, this.position, this.originalContentUri});
 }
 
 final appRouter = GoRouter(
@@ -94,31 +84,6 @@ final appRouter = GoRouter(
           return ImageViewerPage(path: extra);
         }
         return const ImageViewerPage(path: '');
-      },
-    ),
-    GoRoute(
-      path: AppRoutes.audioPlayer,
-      builder: (_, state) {
-        final extra = state.extra;
-        if (extra is AudioPlayerRouteExtra) {
-          return AudioPlayerPage(
-            path: extra.path,
-            fileName: extra.name,
-            initialPosition: extra.position,
-            originalContentUri: extra.originalContentUri,
-          );
-        }
-        if (extra is Map<String, dynamic>) {
-          final path = extra['path'] as String? ?? '';
-          final name = extra['name'] as String?;
-          final position = extra['position'] as Duration?;
-          final originalContentUri = extra['originalContentUri'] as String?;
-          return AudioPlayerPage(path: path, fileName: name, initialPosition: position, originalContentUri: originalContentUri);
-        }
-        if (extra is String) {
-          return AudioPlayerPage(path: extra);
-        }
-        return const AudioPlayerPage(path: '');
       },
     ),
   ],

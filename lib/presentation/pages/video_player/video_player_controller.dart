@@ -1,5 +1,4 @@
 import 'package:video_player/video_player.dart';
-import 'package:fvp/fvp.dart' as fvp;
 import 'package:flutter/foundation.dart';
 import '../../../data/models/subtitle_track.dart';
 import '../../../domain/services/subtitle_service.dart';
@@ -48,17 +47,7 @@ class MyVideoPlayerController {
       await videoController.initialize();
 
       if (_disposed) return;
-
-      try {
-        videoController.setProperty('subtitle', '1');
-        videoController.setProperty('cc', '1');
-      } catch (e) {
-        debugPrint(
-            '[MyVideoPlayerController] Error setting subtitle properties: $e');
-      }
     } catch (e) {
-      debugPrint(
-          '[MyVideoPlayerController] Error initializing videoController: $e');
       rethrow;
     }
 
@@ -128,19 +117,9 @@ class MyVideoPlayerController {
             await _playQueueService.updatePlayProgress(
                 currentPlaying.id, progress);
           }
-        } catch (e) {
-          if (!_disposed) {
-            debugPrint(
-                '[MyVideoPlayerController] Error updating play queue progress: $e');
-          }
-        }
+        } catch (_) {}
       }
-    } catch (e) {
-      if (!_disposed) {
-        debugPrint(
-            '[MyVideoPlayerController] Error updating playback position: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   void play() {
@@ -207,11 +186,7 @@ class MyVideoPlayerController {
     if (_disposed) return;
     try {
       await _playQueueService.playNext();
-    } catch (e) {
-      if (!_disposed) {
-        debugPrint('[MyVideoPlayerController] Error playing next: $e');
-      }
-    }
+    } catch (_) {}
   }
 
   void dispose() {

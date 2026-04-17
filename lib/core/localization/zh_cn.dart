@@ -79,9 +79,8 @@ const Map<String, String> zhCN = {
   'sureToClearAll': '确定要清空全部历史记录吗？',
 
   // 功能选择
-  'playVideo': '播放视频',
+  'playMedia': '播放视频/音频',
   'viewImage': '查看图片',
-  'playAudio': '播放音频',
   
   // 播放列表
   'playList': '播放列表',
@@ -101,9 +100,8 @@ const Map<String, String> zhCN = {
   'deleted': '已删除',
   
   // 功能卡片描述
-  'playVideoDesc': '选择并播放本地视频文件',
+  'playMediaDesc': '选择并播放本地视频或音频文件',
   'viewImageDesc': '选择并查看本地图片文件',
-  'playAudioDesc': '选择并播放本地音频文件',
   
   // 书签页面
   'imageBookmarks': '图片书签',

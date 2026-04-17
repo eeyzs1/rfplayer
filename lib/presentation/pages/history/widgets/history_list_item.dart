@@ -77,7 +77,7 @@ class HistoryListItem extends ConsumerWidget {
               'name': history.displayName,
             });
           } else if (isAudio) {
-            appRouter.push('/audio-player', extra: {
+            appRouter.push('/video-player', extra: {
               'path': history.path,
               'name': history.displayName,
             });
