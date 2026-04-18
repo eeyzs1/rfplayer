@@ -18,24 +18,6 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Remove local dependency overrides
-        run: |
-          python3 -c "
-          lines = open('pubspec.yaml').readlines()
-          result = []
-          skip = False
-          for line in lines:
-              if line.startswith('dependency_overrides:'):
-                  skip = True
-                  continue
-              if skip and line.strip() and not line[0].isspace():
-                  skip = False
-              if not skip:
-                  result.append(line)
-          open('pubspec.yaml', 'w').writelines(result)
-          "
-          rm -rf packages/fvp
-
       - name: Install dependencies
         run: flutter pub get
 
@@ -58,24 +40,6 @@ jobs:
           flutter-version: '3.41.6'
           channel: 'stable'
           cache: true
-
-      - name: Remove local dependency overrides
-        run: |
-          python3 -c "
-          lines = open('pubspec.yaml').readlines()
-          result = []
-          skip = False
-          for line in lines:
-              if line.startswith('dependency_overrides:'):
-                  skip = True
-                  continue
-              if skip and line.strip() and not line[0].isspace():
-                  skip = False
-              if not skip:
-                  result.append(line)
-          open('pubspec.yaml', 'w').writelines(result)
-          "
-          rm -rf packages/fvp
 
       - name: Install dependencies
         run: flutter pub get
