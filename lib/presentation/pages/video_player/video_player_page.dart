@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import '../../../core/utils/toast_utils.dart';
 import '../../../core/utils/real_path_utils.dart';
-import '../../../core/utils/file_utils.dart';
+import '../../../core/constants/supported_formats.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../data/models/subtitle_track.dart';
 import '../../../data/models/play_queue.dart';
@@ -995,7 +995,7 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
       final subtitleTypeGroup = XTypeGroup(
         label: 'Subtitle Files',
         extensions: subtitleExtensions,
-        mimeTypes: Platform.isAndroid ? FileUtils.buildMimeTypes(subtitleExtensions) : null,
+        mimeTypes: Platform.isAndroid ? ['*/*'] : null,
       );
       final result = await FastFilePicker.pickFile(
         acceptedTypeGroups: [subtitleTypeGroup],
@@ -1017,11 +1017,11 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
 
         if (Platform.isAndroid) {
           try {
-            var ext = p.extension(result.name).toLowerCase();
+            var ext = p.extension(result.name).toLowerCase().replaceFirst('.', '');
             if (ext.isEmpty) {
-              ext = p.extension(Uri.parse(contentUri).path).toLowerCase();
+              ext = p.extension(Uri.parse(contentUri).path).toLowerCase().replaceFirst('.', '');
             }
-            final cachedPath = await const MethodChannel('fvp').invokeMethod<String>('CopyContentUri', {
+            final cachedPath = await const MethodChannel('com.rfplayer.app/real_path').invokeMethod<String>('cacheContentUri', {
               'uri': contentUri,
               'ext': ext,
             });
@@ -1050,6 +1050,20 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
       }
 
       if (subtitlePath != null) {
+        final ext = p.extension(subtitlePath).toLowerCase().replaceFirst('.', '');
+        if (!subtitleFormats.contains(ext)) {
+          if (Platform.isAndroid) {
+            try {
+              await const MethodChannel('com.rfplayer.app/real_path').invokeMethod('showToast', {
+                'message': '不支持的字幕格式: .$ext，支持: ${subtitleFormats.join(', ')}',
+              });
+            } catch (_) {}
+          } else if (mounted) {
+            ToastUtils.showToast(context, '不支持的字幕格式: .$ext，支持: ${subtitleFormats.join(', ')}');
+          }
+          _addSubtitle();
+          return;
+        }
         await playerService.controller!.loadSubtitle(subtitlePath);
         if (mounted) {
           ToastUtils.showToast(context, loc.subtitleAdded);

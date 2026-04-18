@@ -7,6 +7,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.nio.charset.Charset
 
@@ -94,6 +95,37 @@ class MainActivity : FlutterActivity() {
                         result.error("INVALID_ARGUMENT", "Uri is null", null)
                     }
                 }
+                "cacheContentUri" -> {
+                    val uriString = call.argument<String>("uri")
+                    val ext = call.argument<String>("ext") ?: ""
+                    if (uriString != null) {
+                        Thread {
+                            try {
+                                val uri = Uri.parse(uriString)
+                                val cachedPath = cacheContentUri(uri, ext)
+                                if (cachedPath != null) {
+                                    runOnUiThread { result.success(cachedPath) }
+                                } else {
+                                    runOnUiThread { result.success(null) }
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MainActivity", "cacheContentUri failed", e)
+                                runOnUiThread { result.success(null) }
+                            }
+                        }.start()
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Uri is null", null)
+                    }
+                }
+                "showToast" -> {
+                    val message = call.argument<String>("message")
+                    if (message != null) {
+                        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
+                        result.success(null)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Message is null", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -124,6 +156,59 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun cacheContentUri(uri: Uri, ext: String): String? {
+        try {
+            val fileName = getFileNameFromUri(uri)
+            val cacheDir = File(cacheDir, "subtitle_cache")
+            if (!cacheDir.exists()) cacheDir.mkdirs()
+
+            val safeExt = if (ext.isNotEmpty()) ext else {
+                val dotIndex = fileName.lastIndexOf('.')
+                if (dotIndex >= 0) fileName.substring(dotIndex + 1).lowercase() else "txt"
+            }
+
+            val baseName = if (fileName.contains('.')) {
+                fileName.substring(0, fileName.lastIndexOf('.'))
+            } else {
+                fileName
+            }
+
+            val cacheFile = File(cacheDir, "$baseName.$safeExt")
+            val input = contentResolver.openInputStream(uri)
+            if (input != null) {
+                input.use { inputStream ->
+                    FileOutputStream(cacheFile).use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+            } else {
+                return null
+            }
+
+            Log.d("MainActivity", "Cached content URI to: ${cacheFile.absolutePath}")
+            return cacheFile.absolutePath
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to cache content URI", e)
+            return null
+        }
+    }
+
+    private fun getFileNameFromUri(uri: Uri): String {
+        var fileName = "subtitle"
+        if (uri.scheme == "content") {
+            val cursor = contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        fileName = it.getString(nameIndex)
+                    }
+                }
+            }
+        }
+        return fileName
     }
 
     private fun extractEmbeddedSubtitles(path: String, streamIndex: Int): Map<String, String>? {
