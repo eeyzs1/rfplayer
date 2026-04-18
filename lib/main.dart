@@ -12,7 +12,7 @@ import 'presentation/providers/permission_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  Logger.root.level = Level.ALL;
+  Logger.root.level = Level.WARNING;
   Logger.root.onRecord.listen((record) {
     debugPrint(
         '${record.loggerName}.${record.level.name}: ${record.time}: ${record.message}',

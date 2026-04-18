@@ -78,6 +78,7 @@ dev_dependencies:
   freezed: ^2.5.8
   json_serializable: ^6.9.5
   riverpod_generator: ^2.6.4
+  mockito: ^5.4.4
 
 dependency_overrides:
   fvp:

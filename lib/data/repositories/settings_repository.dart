@@ -15,7 +15,7 @@ class SettingsRepository {
   T _parseEnum<T>(List<T> values, String? name, T defaultValue) {
     if (name == null) return defaultValue;
     for (final value in values) {
-      if ((value as dynamic).name == name) {
+      if (value.toString().split('.').last == name) {
         return value;
       }
     }
