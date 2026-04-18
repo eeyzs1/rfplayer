@@ -8,6 +8,7 @@
 .history
 
 /packages
+!/packages/fvp
 
 # Flutter repo-specific
 /bin/cache/

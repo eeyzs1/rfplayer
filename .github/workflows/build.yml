@@ -18,6 +18,18 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Remove local dependency overrides
+        run: |
+          python3 -c "
+          import yaml
+          with open('pubspec.yaml', 'r') as f:
+              data = yaml.safe_load(f)
+          if 'dependency_overrides' in data:
+              del data['dependency_overrides']
+          with open('pubspec.yaml', 'w') as f:
+              yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+          "
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -58,6 +70,18 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Remove local dependency overrides
+        run: |
+          python3 -c "
+          import yaml
+          with open('pubspec.yaml', 'r') as f:
+              data = yaml.safe_load(f)
+          if 'dependency_overrides' in data:
+              del data['dependency_overrides']
+          with open('pubspec.yaml', 'w') as f:
+              yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+          "
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -86,6 +110,13 @@ jobs:
           flutter-version: '3.29.3'
           channel: 'stable'
           cache: true
+
+      - name: Remove local dependency overrides
+        shell: pwsh
+        run: |
+          $yaml = Get-Content pubspec.yaml -Raw
+          $yaml = $yaml -replace '(?ms)dependency_overrides:.*$', ''
+          Set-Content pubspec.yaml $yaml
 
       - name: Install dependencies
         run: flutter pub get
