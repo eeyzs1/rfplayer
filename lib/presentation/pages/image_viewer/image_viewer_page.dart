@@ -42,13 +42,20 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
       final settings = ref.read(settingsProvider);
       if (settings.historySaveMode == HistorySaveMode.none) return;
 
-      final safePath = await RealPathUtils.getSafePath(widget.path);
-      final playbackPath = safePath ?? widget.path;
+      final safePath = await RealPathUtils.resolveContentUri(widget.path);
+      final playbackPath = safePath.isPlayable ? safePath.path : widget.path;
+      final displayName = widget.fileName ?? safePath.displayName ?? p.basename(playbackPath);
 
       String historyPath;
       if (settings.historySaveMode == HistorySaveMode.virtualPath &&
           (RealPathUtils.isContentUri(widget.path) || RealPathUtils.isContentUri(widget.originalContentUri ?? ''))) {
         historyPath = widget.originalContentUri ?? widget.path;
+        if (safePath.needsPersistRequest && RealPathUtils.isContentUri(historyPath)) {
+          RealPathUtils.takePersistableUriPermission(historyPath);
+        }
+      } else if (settings.historySaveMode == HistorySaveMode.realPath &&
+          RealPathUtils.isContentUri(playbackPath)) {
+        return;
       } else {
         historyPath = playbackPath;
       }
@@ -57,8 +64,8 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
       var history = await historyRepo.getByPath(historyPath);
       
       String extension;
-      if (widget.fileName != null) {
-        final ext = p.extension(widget.fileName!).toLowerCase();
+      if (displayName.contains('.')) {
+        final ext = p.extension(displayName).toLowerCase();
         extension = ext.length > 1 ? ext.substring(1) : ext;
       } else {
         final ext = p.extension(playbackPath).toLowerCase();
@@ -69,7 +76,7 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
         history = ph.PlayHistory(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           path: historyPath,
-          displayName: widget.fileName ?? p.basename(playbackPath),
+          displayName: displayName,
           extension: extension,
           type: ph.MediaType.image,
           lastPosition: Duration.zero,
@@ -107,8 +114,8 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
     
     try {
       final settings = ref.read(settingsProvider);
-      final safePath = await RealPathUtils.getSafePath(widget.path);
-      final playbackPath = safePath ?? widget.path;
+      final safePath = await RealPathUtils.resolveContentUri(widget.path);
+      final playbackPath = safePath.isPlayable ? safePath.path : widget.path;
 
       String historyPath;
       if (settings.historySaveMode == HistorySaveMode.virtualPath &&
@@ -197,6 +204,14 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
                                 if (context.mounted) {
                                   final localizations = AppLocalizations.of(context)!;
                                   ToastUtils.showToast(context, localizations.saveDisabledHint);
+                                }
+                                return;
+                              }
+                              if (settings.historySaveMode == HistorySaveMode.realPath &&
+                                  RealPathUtils.isContentUri(state.currentPath)) {
+                                if (context.mounted) {
+                                  final localizations = AppLocalizations.of(context)!;
+                                  ToastUtils.showToast(context, localizations.bookmarkNoPermissionHint);
                                 }
                                 return;
                               }
@@ -377,6 +392,14 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
   }
 
   Widget _buildImageWidget(ImageViewerState state) {
+    if (state.imageBytes != null) {
+      return Image.memory(
+        state.imageBytes!,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+      );
+    }
+
     if (widget.bytes != null) {
       return Image.memory(
         widget.bytes!,
@@ -387,6 +410,12 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
 
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator(color: Colors.white));
+    }
+
+    if (RealPathUtils.isContentUri(state.currentPath)) {
+      return Center(
+          child: Text(AppLocalizations.of(context)!.unableToLoadImage, style: TextStyle(color: Colors.white)),
+      );
     }
 
     return Image.file(

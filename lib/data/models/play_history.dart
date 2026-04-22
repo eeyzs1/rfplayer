@@ -1,11 +1,7 @@
 import 'dart:io';
 import '../../core/extensions/duration_extensions.dart';
-
-enum MediaType {
-  video,
-  image,
-  audio,
-}
+import '../../core/utils/real_path_utils.dart' show MediaType;
+export '../../core/utils/real_path_utils.dart' show MediaType;
 
 class PlayHistory {
   final String id;

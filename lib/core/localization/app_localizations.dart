@@ -164,6 +164,27 @@ class AppLocalizations {
   String get saveVirtualPathDesc => localizedStrings['saveVirtualPathDesc']!;
   String get saveVirtualPathTag => localizedStrings['saveVirtualPathTag']!;
   String get saveDisabledHint => localizedStrings['saveDisabledHint']!;
+  String get bookmarkNoPermissionHint => localizedStrings['bookmarkNoPermissionHint']!;
+  String get unableToOpenFile => localizedStrings['unableToOpenFile']!;
+  String get unableToLoadImage => localizedStrings['unableToLoadImage']!;
+  String get browse => localizedStrings['browse']!;
+  String get retry => localizedStrings['retry']!;
+  String get noSubtitleFiles => localizedStrings['noSubtitleFiles']!;
+  String get chooseAnotherFolder => localizedStrings['chooseAnotherFolder']!;
+  String get duration => localizedStrings['duration']!;
+  String get unsupportedSubtitleFormat => localizedStrings['unsupportedSubtitleFormat']!;
+  String get videoBookmarkAdded => localizedStrings['videoBookmarkAdded']!;
+  String get fileAccessDenied => localizedStrings['fileAccessDenied']!;
+  String get fileAccessDeniedReselect => localizedStrings['fileAccessDeniedReselect']!;
+  String get fileAccessDeniedRetry => localizedStrings['fileAccessDeniedRetry']!;
+  String get subtitleFileAccessDenied => localizedStrings['subtitleFileAccessDenied']!;
+  String get currentPosition => localizedStrings['currentPosition']!;
+  String get customSpeed => localizedStrings['customSpeed']!;
+  String get reset => localizedStrings['reset']!;
+  String get delete => localizedStrings['delete']!;
+  String get sureToDeleteBookmark => localizedStrings['sureToDeleteBookmark']!;
+  String get deleteBookmark => localizedStrings['deleteBookmark']!;
+  String get playQueue => localizedStrings['playQueue']!;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

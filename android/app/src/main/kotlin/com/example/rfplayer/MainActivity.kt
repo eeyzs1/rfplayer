@@ -1,8 +1,13 @@
 package com.example.rfplayer
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -14,10 +19,22 @@ import java.nio.charset.Charset
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.rfplayer.app/real_path"
     private val SUBTITLE_CHANNEL = "com.rfplayer.app/subtitle"
+    private val INTENT_CHANNEL = "com.rfplayer.app/intent"
+    private var initialIntentUri: String? = null
+    private var pendingIntentUri: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INTENT_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialIntentUri" -> {
+                    result.success(initialIntentUri)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getRealPath" -> {
@@ -36,6 +53,20 @@ class MainActivity : FlutterActivity() {
                         }
                     } else {
                         result.error("INVALID_ARGUMENT", "Uri is null", null)
+                    }
+                }
+                "getDisplayName" -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString != null) {
+                        try {
+                            val uri = Uri.parse(uriString)
+                            val name = RealPathUtil.getDisplayName(this, uri)
+                            result.success(name)
+                        } catch (e: Exception) {
+                            result.success(null)
+                        }
+                    } else {
+                        result.success(null)
                     }
                 }
                 "takePersistableUriPermission" -> {
@@ -83,9 +114,8 @@ class MainActivity : FlutterActivity() {
                             val uri = Uri.parse(uriString)
                             val persistedPermissions = contentResolver.persistedUriPermissions
                             val hasPermission = persistedPermissions.any {
-                                it.uri == uri && it.isReadPermission
+                                it.uri.toString() == uri.toString() && it.isReadPermission
                             }
-                            Log.d("MainActivity", "hasPersistableUriPermission: $uriString -> $hasPermission")
                             result.success(hasPermission)
                         } catch (e: Exception) {
                             Log.e("MainActivity", "hasPersistableUriPermission failed: $uriString", e)
@@ -98,11 +128,12 @@ class MainActivity : FlutterActivity() {
                 "cacheContentUri" -> {
                     val uriString = call.argument<String>("uri")
                     val ext = call.argument<String>("ext") ?: ""
+                    val cacheDir = call.argument<String>("cacheDir") ?: "subtitle_cache"
                     if (uriString != null) {
                         Thread {
                             try {
                                 val uri = Uri.parse(uriString)
-                                val cachedPath = cacheContentUri(uri, ext)
+                                val cachedPath = cacheContentUri(uri, ext, cacheDir)
                                 if (cachedPath != null) {
                                     runOnUiThread { result.success(cachedPath) }
                                 } else {
@@ -124,6 +155,70 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     } else {
                         result.error("INVALID_ARGUMENT", "Message is null", null)
+                    }
+                }
+                "getSdkVersion" -> {
+                    result.success(Build.VERSION.SDK_INT)
+                }
+                "canOpenFileNative" -> {
+                    val path = call.argument<String>("path")
+                    if (path != null) {
+                        try {
+                            val fd = Os.open(path, OsConstants.O_RDONLY, 0)
+                            Os.close(fd)
+                            Log.d("MainActivity", "canOpenFileNative: $path -> true")
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.d("MainActivity", "canOpenFileNative: $path -> false (${e.message})")
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
+                    }
+                }
+                "hasMediaPermission" -> {
+                    val mediaType = call.argument<String>("mediaType") ?: "unknown"
+                    val granted = when {
+                        Build.VERSION.SDK_INT >= 33 -> {
+                            when (mediaType) {
+                                "video" -> ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+                                "audio" -> ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                "image" -> ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+                                else -> {
+                                    val v = ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+                                    val a = ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+                                    val i = ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+                                    v || a || i
+                                }
+                            }
+                        }
+                        else -> ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+                    }
+                    Log.d("MainActivity", "hasMediaPermission: mediaType=$mediaType, sdk=${Build.VERSION.SDK_INT}, granted=$granted")
+                    result.success(granted)
+                }
+                "readContentUriBytes" -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString != null) {
+                        Thread {
+                            try {
+                                val uri = Uri.parse(uriString)
+                                val inputStream = contentResolver.openInputStream(uri)
+                                if (inputStream != null) {
+                                    val bytes = inputStream.use { it.readBytes() }
+                                    Log.d("MainActivity", "readContentUriBytes: read ${bytes.size} bytes from $uriString")
+                                    runOnUiThread { result.success(bytes) }
+                                } else {
+                                    Log.e("MainActivity", "readContentUriBytes: openInputStream returned null for $uriString")
+                                    runOnUiThread { result.success(null) }
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MainActivity", "readContentUriBytes failed: $uriString", e)
+                                runOnUiThread { result.success(null) }
+                            }
+                        }.start()
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Uri is null", null)
                     }
                 }
                 else -> result.notImplemented()
@@ -156,12 +251,45 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        handleIncomingIntent(intent)
     }
 
-    private fun cacheContentUri(uri: Uri, ext: String): String? {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent == null) return
+        if (intent.action != Intent.ACTION_VIEW) return
+
+        val uri = intent.data
+        if (uri != null) {
+            val uriString = uri.toString()
+            Log.d("MainActivity", "Received intent with URI: $uriString")
+            if (initialIntentUri == null) {
+                initialIntentUri = uriString
+            } else {
+                notifyFlutterOfNewIntent(uriString)
+            }
+        }
+    }
+
+    private fun notifyFlutterOfNewIntent(uriString: String) {
+        try {
+            val channel = MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger ?: return, INTENT_CHANNEL)
+            channel.invokeMethod("onNewIntent", uriString)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to notify Flutter of new intent", e)
+        }
+    }
+
+    private fun cacheContentUri(uri: Uri, ext: String, cacheSubDir: String = "subtitle_cache"): String? {
         try {
             val fileName = getFileNameFromUri(uri)
-            val cacheDir = File(cacheDir, "subtitle_cache")
+            val cacheDir = File(cacheDir, cacheSubDir)
             if (!cacheDir.exists()) cacheDir.mkdirs()
 
             val safeExt = if (ext.isNotEmpty()) ext else {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/bookmark_provider.dart';
 import '../../../providers/file_browser_provider.dart';
+import '../../../../core/localization/app_localizations.dart';
 
 class BookmarkPanel extends ConsumerWidget {
   const BookmarkPanel({super.key});
@@ -51,19 +52,16 @@ class BookmarkPanel extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除书签'),
-        content: const Text('确定要删除这个书签吗？'),
+        title: Text(AppLocalizations.of(context)!.deleteBookmark),
+        content: Text(AppLocalizations.of(context)!.sureToDeleteBookmark),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           TextButton(
-            onPressed: () {
-              ref.read(bookmarkProvider.notifier).deleteBookmark(id);
-              Navigator.pop(context);
-            },
-            child: const Text('删除'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(AppLocalizations.of(context)!.delete),
           ),
         ],
       ),

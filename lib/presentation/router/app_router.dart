@@ -15,8 +15,10 @@ class VideoPlayerRouteExtra {
   final String? name;
   final Duration? position;
   final String? originalContentUri;
+  final bool canStoreInHistory;
+  final bool needsPersistRequest;
 
-  const VideoPlayerRouteExtra({required this.path, this.name, this.position, this.originalContentUri});
+  const VideoPlayerRouteExtra({required this.path, this.name, this.position, this.originalContentUri, this.canStoreInHistory = true, this.needsPersistRequest = false});
 }
 
 class ImageViewerRouteExtra {
@@ -51,6 +53,8 @@ final appRouter = GoRouter(
             fileName: extra.name,
             initialPosition: extra.position,
             originalContentUri: extra.originalContentUri,
+            canStoreInHistory: extra.canStoreInHistory,
+            needsPersistRequest: extra.needsPersistRequest,
           );
         }
         if (extra is Map<String, dynamic>) {
@@ -58,7 +62,9 @@ final appRouter = GoRouter(
           final name = extra['name'] as String?;
           final position = extra['position'] as Duration?;
           final originalContentUri = extra['originalContentUri'] as String?;
-          return VideoPlayerPage(path: path, fileName: name, initialPosition: position, originalContentUri: originalContentUri);
+          final canStoreInHistory = extra['canStoreInHistory'] as bool? ?? true;
+          final needsPersistRequest = extra['needsPersistRequest'] as bool? ?? false;
+          return VideoPlayerPage(path: path, fileName: name, initialPosition: position, originalContentUri: originalContentUri, canStoreInHistory: canStoreInHistory, needsPersistRequest: needsPersistRequest);
         }
         if (extra is String) {
           return VideoPlayerPage(path: extra);

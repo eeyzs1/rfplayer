@@ -5,9 +5,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:logging/logging.dart';
 import 'app.dart';
 import 'package:fvp/fvp.dart' as fvp;
+import 'core/localization/app_localizations.dart';
 import 'presentation/providers/play_queue_provider.dart';
 import 'presentation/providers/history_provider.dart';
 import 'presentation/providers/permission_provider.dart';
+import 'core/utils/intent_utils.dart';
+import 'core/utils/real_path_utils.dart';
+import 'core/constants/app_routes.dart';
+import 'presentation/router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,6 +88,7 @@ class AppInitializer extends ConsumerStatefulWidget {
 
 class _AppInitializerState extends ConsumerState<AppInitializer> {
   bool _isInitialized = false;
+  ResolvedMediaPath? _pendingResolved;
 
   @override
   void initState() {
@@ -98,20 +104,90 @@ class _AppInitializerState extends ConsumerState<AppInitializer> {
       final historyActions = ref.read(historyActionsProvider);
       await historyActions.cleanupInvalidRecords();
 
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      final permissionState = ref.read(permissionProvider);
-      if (!permissionState.hasRequestedBefore &&
-          permissionState.storagePermission == PermissionStatus.notDetermined) {
-        final permissionNotifier = ref.read(permissionProvider.notifier);
-        await permissionNotifier.requestStoragePermission();
+      final initialUri = await IntentUtils.getInitialFileUri();
+      if (initialUri != null) {
+        _pendingResolved = await IntentUtils.resolveToFilePath(initialUri);
       }
-    } catch (_) {} finally {
+
       if (mounted) {
         setState(() {
           _isInitialized = true;
         });
       }
+
+      if (_pendingResolved != null && _pendingResolved!.isPlayable && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _navigateToMedia(_pendingResolved!);
+        });
+      } else if (_pendingResolved != null && !_pendingResolved!.isPlayable && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final loc = AppLocalizations.of(context)!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.unableToOpenFile)),
+          );
+        });
+      }
+
+      IntentUtils.setupIntentListener((uri) async {
+        if (!mounted) return;
+        final resolved = await IntentUtils.resolveToFilePath(uri);
+        if (resolved.isPlayable && mounted) {
+          _navigateToMedia(resolved);
+        } else if (mounted) {
+          final loc = AppLocalizations.of(context)!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.unableToOpenFile)),
+          );
+        }
+      });
+
+      final permissionState = ref.read(permissionProvider);
+      if (!permissionState.hasRequestedBefore &&
+          permissionState.storagePermission == PermissionStatus.notDetermined) {
+        final permissionNotifier = ref.read(permissionProvider.notifier);
+        permissionNotifier.requestStoragePermission();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    }
+  }
+
+  void _navigateToMedia(ResolvedMediaPath resolved) {
+    if (!mounted) return;
+    final nameForType = resolved.displayName ?? resolved.path;
+    final mediaType = IntentUtils.getMediaType(nameForType);
+    final fileName = resolved.displayName ?? IntentUtils.getFileNameFromUri(resolved.path) ?? resolved.path.split(Platform.pathSeparator).last;
+
+    switch (mediaType) {
+      case MediaType.video:
+      case MediaType.audio:
+        appRouter.push(
+          AppRoutes.videoPlayer,
+          extra: VideoPlayerRouteExtra(
+            path: resolved.path,
+            name: fileName,
+            originalContentUri: resolved.originalContentUri,
+            canStoreInHistory: resolved.canStoreInHistory,
+            needsPersistRequest: resolved.needsPersistRequest,
+          ),
+        );
+        break;
+      case MediaType.image:
+        appRouter.push(
+          AppRoutes.imageViewer,
+          extra: ImageViewerRouteExtra(
+            path: resolved.path,
+            name: fileName,
+            originalContentUri: resolved.originalContentUri,
+          ),
+        );
+        break;
+      case MediaType.unknown:
+        break;
     }
   }
 

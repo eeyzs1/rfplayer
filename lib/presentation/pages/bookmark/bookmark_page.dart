@@ -58,9 +58,19 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
                       ),
                     ),
                     ...imageBookmarks.map((bookmark) {
+                      final displayTitle = RealPathUtils.isContentUri(bookmark.imagePath) && !bookmark.imageName.contains('.')
+                          ? null
+                          : bookmark.imageName;
                       return ListTile(
                         leading: _buildImageThumbnail(bookmark.imagePath),
-                        title: Text(bookmark.imageName),
+                        title: displayTitle != null
+                            ? Text(displayTitle)
+                            : FutureBuilder<String?>(
+                                future: RealPathUtils.getDisplayName(bookmark.imagePath),
+                                builder: (context, snapshot) {
+                                  return Text(snapshot.data ?? bookmark.imageName);
+                                },
+                              ),
                         subtitle: Text(
                           _formatDateTime(bookmark.createdAt),
                           style: const TextStyle(fontSize: 12),
@@ -102,13 +112,9 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
   }
 
   Widget _buildImageThumbnail(String imagePath) {
-    final effectivePath = RealPathUtils.isContentUri(imagePath) ? null : imagePath;
-    if (effectivePath == null) {
-      return _buildPlaceholderIcon(Icons.image, Colors.green);
-    }
     return Consumer(
       builder: (context, ref, child) {
-        final thumbnailAsync = ref.watch(cachedThumbnailProvider(effectivePath));
+        final thumbnailAsync = ref.watch(cachedThumbnailProvider(imagePath));
 
         return thumbnailAsync.when(
           data: (thumbPath) {
@@ -134,13 +140,9 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
   }
 
   Widget _buildVideoThumbnail(String videoPath) {
-    final effectivePath = RealPathUtils.isContentUri(videoPath) ? null : videoPath;
-    if (effectivePath == null) {
-      return _buildPlaceholderIcon(Icons.video_file, Colors.blue);
-    }
     return Consumer(
       builder: (context, ref, child) {
-        final thumbnailAsync = ref.watch(cachedThumbnailProvider(effectivePath));
+        final thumbnailAsync = ref.watch(cachedThumbnailProvider(videoPath));
 
         return thumbnailAsync.when(
           data: (thumbPath) {
@@ -209,10 +211,20 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
       final bookmarks = entry.value;
       final videoName = bookmarks.first.videoName;
       final videoPath = entry.key;
+      final displayVideoName = RealPathUtils.isContentUri(videoPath) && !videoName.contains('.')
+          ? null
+          : videoName;
 
       return ExpansionTile(
         leading: _buildVideoThumbnail(videoPath),
-        title: Text(videoName),
+        title: displayVideoName != null
+            ? Text(displayVideoName)
+            : FutureBuilder<String?>(
+                future: RealPathUtils.getDisplayName(videoPath),
+                builder: (context, snapshot) {
+                  return Text(snapshot.data ?? videoName);
+                },
+              ),
         subtitle: Text('${bookmarks.length} ${loc.bookmarksCount}'),
         children: bookmarks.map((bookmark) {
           return ListTile(
@@ -278,16 +290,21 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
   Future<void> _openVideoAtPosition(String videoPath, Duration position) async {
     String? pathToUse = videoPath;
     String? originalContentUri;
+    String? displayName;
 
     if (RealPathUtils.isContentUri(videoPath)) {
-      originalContentUri = videoPath;
-      pathToUse = await RealPathUtils.getSafePath(videoPath);
-      if (pathToUse == null) {
+      final resolved = await RealPathUtils.resolveContentUri(videoPath);
+      if (!resolved.isPlayable) {
         if (mounted) {
-          ToastUtils.showToast(context, '无法访问该文件，权限可能已失效');
+          ToastUtils.showToast(context, AppLocalizations.of(context)!.fileAccessDenied);
         }
         return;
       }
+      pathToUse = resolved.path;
+      if (resolved.originalContentUri != null) {
+        originalContentUri = resolved.originalContentUri;
+      }
+      displayName = resolved.displayName;
     }
 
     if (mounted) {
@@ -295,6 +312,7 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
         'path': pathToUse,
         'position': position,
         'originalContentUri': originalContentUri,
+        'name': displayName,
       });
     }
   }
@@ -302,22 +320,28 @@ class _BookmarkPageState extends ConsumerState<BookmarkPage> {
   Future<void> _openImage(String imagePath) async {
     String? pathToUse = imagePath;
     String? originalContentUri;
+    String? displayName;
 
     if (RealPathUtils.isContentUri(imagePath)) {
-      originalContentUri = imagePath;
-      pathToUse = await RealPathUtils.getSafePath(imagePath);
-      if (pathToUse == null) {
+      final resolved = await RealPathUtils.resolveContentUri(imagePath);
+      if (!resolved.isPlayable) {
         if (mounted) {
-          ToastUtils.showToast(context, '无法访问该文件，权限可能已失效');
+          ToastUtils.showToast(context, AppLocalizations.of(context)!.fileAccessDenied);
         }
         return;
       }
+      pathToUse = resolved.path;
+      if (resolved.originalContentUri != null) {
+        originalContentUri = resolved.originalContentUri;
+      }
+      displayName = resolved.displayName;
     }
 
     if (mounted) {
       context.push('/image-viewer', extra: {
         'path': pathToUse,
         'originalContentUri': originalContentUri,
+        'fileName': displayName,
       });
     }
   }

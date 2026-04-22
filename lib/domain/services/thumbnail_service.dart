@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
 import '../../data/models/play_history.dart' show MediaType;
+import '../../core/utils/real_path_utils.dart';
 
 class ThumbnailService {
   static const int _maxMemoryCacheSize = 100;
@@ -206,11 +208,18 @@ class ThumbnailService {
 
   Future<String?> _generateImageThumbnail(String filePath, String thumbPath, String cacheKey) async {
     try {
-      final file = File(filePath);
-      if (!await file.exists()) return null;
+      Uint8List bytes;
 
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) return null;
+      if (RealPathUtils.isContentUri(filePath)) {
+        final contentBytes = await RealPathUtils.readContentUriBytes(filePath);
+        if (contentBytes == null || contentBytes.isEmpty) return null;
+        bytes = contentBytes;
+      } else {
+        final file = File(filePath);
+        if (!await file.exists()) return null;
+        bytes = await file.readAsBytes();
+        if (bytes.isEmpty) return null;
+      }
 
       final codec = await instantiateImageCodec(
         bytes,
@@ -226,14 +235,16 @@ class ThumbnailService {
       _addToMemoryCache(cacheKey, thumbPath);
       return thumbPath;
     } catch (e) {
-      try {
-        final file = File(filePath);
-        if (await file.exists()) {
-          await file.copy(thumbPath);
-          _addToMemoryCache(cacheKey, thumbPath);
-          return thumbPath;
-        }
-      } catch (_) {}
+      if (!RealPathUtils.isContentUri(filePath)) {
+        try {
+          final file = File(filePath);
+          if (await file.exists()) {
+            await file.copy(thumbPath);
+            _addToMemoryCache(cacheKey, thumbPath);
+            return thumbPath;
+          }
+        } catch (_) {}
+      }
     }
     return null;
   }

@@ -308,8 +308,10 @@ class VideoPlayerPage extends ConsumerStatefulWidget {
   final Duration? initialPosition;
   final String? fileName;
   final String? originalContentUri;
+  final bool canStoreInHistory;
+  final bool needsPersistRequest;
 
-  const VideoPlayerPage({super.key, required this.path, this.initialPosition, this.fileName, this.originalContentUri});
+  const VideoPlayerPage({super.key, required this.path, this.initialPosition, this.fileName, this.originalContentUri, this.canStoreInHistory = true, this.needsPersistRequest = false});
 
   @override
   ConsumerState<VideoPlayerPage> createState() => _VideoPlayerPageState();
@@ -487,6 +489,26 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
     super.dispose();
   }
   
+  void _persistAndSaveHistory(String contentUri) {
+    RealPathUtils.takePersistableUriPermission(contentUri).then((success) {
+      if (!success) return;
+      try {
+        final playerService = ref.read(playerServiceProvider);
+        final duration = playerService.controller?.duration ?? Duration.zero;
+        final historyService = PlaybackHistoryService(
+          repository: ref.read(historyRepositoryProvider),
+          thumbnailService: ref.read(thumbnailServiceProvider),
+          historySaveMode: ref.read(settingsProvider).historySaveMode,
+        );
+        historyService.getOrCreateHistory(
+          contentUri,
+          fileName: widget.fileName,
+          totalDuration: duration != Duration.zero ? duration : null,
+        );
+      } catch (_) {}
+    });
+  }
+
   // 处理返回按钮点击
   Future<void> _handleBackPress() async {
     if (_isDisposing) return;
@@ -612,6 +634,13 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
       final settings = ref.read(settingsProvider);
       _playbackSpeed = settings.defaultPlaybackSpeed;
 
+      if (widget.needsPersistRequest &&
+          widget.originalContentUri != null &&
+          RealPathUtils.isContentUri(widget.originalContentUri!) &&
+          settings.historySaveMode == HistorySaveMode.virtualPath) {
+        _persistAndSaveHistory(widget.originalContentUri!);
+      }
+
       final playQueueNotifier = ref.read(playQueueProvider.notifier);
       final playQueueService = ref.read(playQueueServiceProvider);
       final fileName = widget.fileName ?? p.basename(widget.path);
@@ -636,10 +665,21 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
         fileName: fileName,
         onCreateController: (safePath, fName, originalPath) async {
           final settings = ref.read(settingsProvider);
-          final virtualPathCandidate = widget.originalContentUri ?? originalPath;
-          final effectiveHistoryPath = settings.historySaveMode == HistorySaveMode.virtualPath
-              ? (RealPathUtils.isContentUri(virtualPathCandidate) ? virtualPathCandidate : null)
-              : null;
+          String? effectiveHistoryPath;
+
+          if (widget.canStoreInHistory) {
+            effectiveHistoryPath = safePath;
+            if (settings.historySaveMode == HistorySaveMode.virtualPath) {
+              final virtualPathCandidate = widget.originalContentUri ?? originalPath;
+              if (RealPathUtils.isContentUri(virtualPathCandidate)) {
+                effectiveHistoryPath = virtualPathCandidate;
+              }
+            } else if (settings.historySaveMode == HistorySaveMode.realPath &&
+                RealPathUtils.isContentUri(safePath)) {
+              effectiveHistoryPath = null;
+            }
+          }
+
           final controller = MyVideoPlayerController(
             safePath,
             fileName: fName,
@@ -685,7 +725,6 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
         _startListeningToPlayer();
       }
     } catch (_) {} finally {
-      // 清除初始化标志
       if (mounted) {
         setState(() {
           _isInitializing = false;
@@ -1032,16 +1071,16 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
         }
 
         if (subtitlePath == null) {
-          final realPath = await RealPathUtils.getSafePath(contentUri);
-          if (realPath != null) {
-            subtitlePath = realPath;
+          final resolved = await RealPathUtils.resolveContentUri(contentUri);
+          if (resolved.isPlayable) {
+            subtitlePath = resolved.path;
           }
         }
 
         if (subtitlePath == null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('无法访问该字幕文件'),
+              SnackBar(
+                content: Text(loc.subtitleFileAccessDenied),
               duration: Duration(seconds: 3),
             ),
           );
@@ -1059,7 +1098,7 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
               });
             } catch (_) {}
           } else if (mounted) {
-            ToastUtils.showToast(context, '不支持的字幕格式: .$ext，支持: ${subtitleFormats.join(', ')}');
+            ToastUtils.showToast(context, '${loc.unsupportedSubtitleFormat}: .$ext，${loc.format}: ${subtitleFormats.join(', ')}');
           }
           _addSubtitle();
           return;
@@ -1166,23 +1205,32 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
       return;
     }
 
+    if (settings.historySaveMode == HistorySaveMode.realPath &&
+        RealPathUtils.isContentUri(widget.path)) {
+      if (mounted) {
+        final localizations = AppLocalizations.of(context)!;
+        ToastUtils.showToast(context, localizations.bookmarkNoPermissionHint);
+      }
+      return;
+    }
+
     final currentPosition = playerService.controller!.position;
     final videoPath = settings.historySaveMode == HistorySaveMode.virtualPath &&
             widget.originalContentUri != null
         ? widget.originalContentUri!
         : widget.path;
-    final videoName = p.basename(widget.path);
+    final videoName = widget.fileName ?? p.basename(widget.path);
     
     if (mounted) {
       String? note;
       await showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('添加书签'),
+          title: Text(AppLocalizations.of(context)!.addBookmark),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('当前位置: ${_formatDuration(currentPosition)}'),
+              Text('${AppLocalizations.of(context)!.currentPosition}: ${_formatDuration(currentPosition)}'),
               const SizedBox(height: 16),
               TextField(
                 decoration: const InputDecoration(
@@ -1196,7 +1244,7 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
+              child: Text(AppLocalizations.of(context)!.cancel),
             ),
             TextButton(
               onPressed: () async {
@@ -1208,10 +1256,10 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
                   note: note?.isNotEmpty == true ? note : null,
                 );
                 if (mounted) {
-                  ToastUtils.showToast(context, '书签已添加: ${_formatDuration(currentPosition)}');
+                  ToastUtils.showToast(context, '${AppLocalizations.of(context)!.videoBookmarkAdded}: ${_formatDuration(currentPosition)}');
                 }
               },
-              child: const Text('添加'),
+              child: Text(AppLocalizations.of(context)!.confirm),
             ),
           ],
         ),
@@ -2017,7 +2065,7 @@ class _VideoPlayerPageState extends ConsumerState<VideoPlayerPage> {
               const SizedBox(height: 8),
               Text('${loc.filePath}: $displayPath', style: const TextStyle(color: Colors.white70, fontSize: 12)),
               const SizedBox(height: 8),
-              Text('Duration: ${_formatDuration(_duration)}', style: const TextStyle(color: Colors.white)),
+              Text('${AppLocalizations.of(context)!.duration}: ${_formatDuration(_duration)}', style: const TextStyle(color: Colors.white)),
             ],
           ),
         ),

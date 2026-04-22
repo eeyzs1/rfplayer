@@ -8,9 +8,7 @@ import '../../router/app_router.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/thumbnail_provider.dart';
 import '../../providers/permission_provider.dart';
-import '../../providers/settings_provider.dart';
 import '../../../data/models/play_history.dart';
-import '../../../data/models/app_settings.dart';
 import '../../../core/extensions/string_extensions.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../core/constants/supported_formats.dart';
@@ -82,23 +80,6 @@ class _FileBrowserPageState extends ConsumerState<FileBrowserPage> {
   }
 
   Future<void> _pickFile() async {
-    final permissionState = ref.read(permissionProvider);
-    if (!permissionState.hasStoragePermission) {
-      final permissionNotifier = ref.read(permissionProvider.notifier);
-      final granted = await permissionNotifier.requestStoragePermission();
-      if (!granted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Permission denied: Storage permission'),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-    }
-
     final videoTypeGroup = XTypeGroup(
       label: 'Video Files',
       extensions: videoFormats.toList(),
@@ -124,33 +105,25 @@ class _FileBrowserPageState extends ConsumerState<FileBrowserPage> {
       String? originalContentUri;
       Uint8List? imageBytes;
 
-      final settings = ref.read(settingsProvider);
-
       if (result.path != null) {
         pathToUse = result.path;
       } else if (result.uri != null) {
         final contentUri = result.uri.toString();
 
-        if (settings.historySaveMode == HistorySaveMode.virtualPath && Platform.isAndroid) {
-          final persisted = await RealPathUtils.takePersistableUriPermission(contentUri);
-          if (persisted) {
-            originalContentUri = contentUri;
-          }
-        }
-
-        pathToUse = await RealPathUtils.getSafePath(contentUri);
-
-        if (pathToUse == null) {
+        final resolved = await RealPathUtils.resolveContentUri(contentUri);
+        if (!resolved.isPlayable) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('无法访问该文件，请使用文件选择器重新选择'),
+                SnackBar(
+                  content: Text(AppLocalizations.of(context)!.fileAccessDeniedReselect),
                 duration: Duration(seconds: 3),
               ),
             );
           }
           return;
         }
+        pathToUse = resolved.path;
+        originalContentUri = resolved.originalContentUri;
       }
 
       if (pathToUse != null && mounted) {
@@ -163,14 +136,18 @@ class _FileBrowserPageState extends ConsumerState<FileBrowserPage> {
             'path': pathToUse,
             'name': result.name,
             'originalContentUri': originalContentUri,
+            'needsPersistRequest': RealPathUtils.isContentUri(result.uri?.toString() ?? ''),
+            'canStoreInHistory': !RealPathUtils.isContentUri(result.uri?.toString() ?? ''),
           });
         } else if (isImage) {
-          try {
-            final file = File(pathToUse);
-            if (await file.exists()) {
-              imageBytes = await file.readAsBytes();
-            }
-          } catch (_) {}
+          if (!RealPathUtils.isContentUri(pathToUse)) {
+            try {
+              final file = File(pathToUse);
+              if (await file.exists()) {
+                imageBytes = await file.readAsBytes();
+              }
+            } catch (_) {}
+          }
 
           appRouter.push('/image-viewer', extra: {
             'path': pathToUse,
@@ -183,6 +160,8 @@ class _FileBrowserPageState extends ConsumerState<FileBrowserPage> {
             'path': pathToUse,
             'name': result.name,
             'originalContentUri': originalContentUri,
+            'needsPersistRequest': RealPathUtils.isContentUri(result.uri?.toString() ?? ''),
+            'canStoreInHistory': !RealPathUtils.isContentUri(result.uri?.toString() ?? ''),
           });
         }
       }
@@ -340,25 +319,28 @@ class _HistoryListItemState extends ConsumerState<_HistoryListItem> {
               originalContentUri = widget.history.path;
             }
 
-            final pathToUse = await RealPathUtils.getSafePath(widget.history.path);
-
-            if (pathToUse == null) {
+            final resolved = await RealPathUtils.resolveContentUri(widget.history.path);
+            if (!resolved.isPlayable) {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('无法访问该文件，请重新选择'),
+                    SnackBar(
+                      content: Text(AppLocalizations.of(context)!.fileAccessDeniedRetry),
                     duration: Duration(seconds: 3),
                   ),
                 );
               }
               return;
             }
+            final pathToUse = resolved.path;
+            originalContentUri = resolved.originalContentUri ?? originalContentUri;
 
             if (isVideo || isAudio) {
               appRouter.push('/video-player', extra: {
                 'path': pathToUse,
                 'name': widget.history.displayName,
                 'originalContentUri': originalContentUri,
+                'needsPersistRequest': resolved.needsPersistRequest,
+                'canStoreInHistory': resolved.canStoreInHistory,
               });
             } else {
               appRouter.push('/image-viewer', extra: {

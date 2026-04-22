@@ -1,5 +1,6 @@
 import 'package:video_player/video_player.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/utils/real_path_utils.dart';
 import '../../../data/models/subtitle_track.dart';
 import '../../../domain/services/subtitle_service.dart';
 import '../../../domain/services/playback_history_service.dart';
@@ -31,7 +32,11 @@ class MyVideoPlayerController {
         _historyService = historyService,
         _playQueueService = playQueueService,
         _onStateChanged = onStateChanged {
-    videoController = VideoPlayerController.file(File(path));
+    if (RealPathUtils.isContentUri(path)) {
+      videoController = VideoPlayerController.contentUri(Uri.parse(path));
+    } else {
+      videoController = VideoPlayerController.file(File(path));
+    }
     _subtitleService = SubtitleService(videoController);
     _subtitleService.onStateChanged = _onStateChanged;
   }

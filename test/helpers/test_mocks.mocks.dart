@@ -321,6 +321,15 @@ class MockHistoryDao extends _i1.Mock implements _i7.HistoryDao {
           as _i5.Future<_i9.PlayHistory?>);
 
   @override
+  _i5.Future<_i9.PlayHistory?> getById(String? id) =>
+      (super.noSuchMethod(
+            Invocation.method(#getById, [id]),
+            returnValue: _i5.Future<_i9.PlayHistory?>.value(),
+            returnValueForMissingStub: _i5.Future<_i9.PlayHistory?>.value(),
+          )
+          as _i5.Future<_i9.PlayHistory?>);
+
+  @override
   _i5.Future<void> upsert(_i9.PlayHistory? history) =>
       (super.noSuchMethod(
             Invocation.method(#upsert, [history]),

@@ -22,6 +22,11 @@ class HistoryDao extends DatabaseAccessor<AppDatabase> with _$HistoryDaoMixin {
     return row != null ? PlayHistory.fromDb(row) : null;
   }
 
+  Future<PlayHistory?> getById(String id) async {
+    final row = await (select(playHistoryTable)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return row != null ? PlayHistory.fromDb(row) : null;
+  }
+
   Future<void> upsert(PlayHistory history) async {
     final lastPositionMs = history.lastPosition?.inMilliseconds;
     final totalDurationMs = history.totalDuration?.inMilliseconds;

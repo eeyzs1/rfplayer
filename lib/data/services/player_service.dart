@@ -22,12 +22,18 @@ class PlayerService extends ChangeNotifier {
     try {
       _disposeController();
 
-      final pathToUse = await RealPathUtils.getSafePath(path);
-      if (pathToUse == null) return;
+      final String safePath;
+      if (RealPathUtils.isContentUri(path)) {
+        safePath = path;
+      } else {
+        final resolved = await RealPathUtils.getSafePath(path);
+        if (resolved == null) return;
+        safePath = resolved;
+      }
 
-      await onCreateController(pathToUse, fileName, path);
+      await onCreateController(safePath, fileName, path);
 
-      _currentPath = pathToUse;
+      _currentPath = safePath;
       _isInitialized = true;
       notifyStateChanged();
     } finally {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../presentation/providers/play_queue_provider.dart';
+import '../../../core/localization/app_localizations.dart';
 import 'play_list_item.dart';
 
 class AndroidPlayListDrawer extends ConsumerStatefulWidget {
@@ -49,7 +50,7 @@ class _AndroidPlayListDrawerState extends ConsumerState<AndroidPlayListDrawer> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('播放列表', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text(AppLocalizations.of(context)!.playQueue, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 IconButton(
                   icon: const Icon(Icons.close),
                   onPressed: widget.onClose,
@@ -85,15 +86,15 @@ class _AndroidPlayListDrawerState extends ConsumerState<AndroidPlayListDrawer> {
               children: [
                 ElevatedButton(
                   onPressed: () => playQueueNotifier.playPrevious(),
-                  child: const Text('上一个'),
+                  child: Text(AppLocalizations.of(context)!.previous),
                 ),
                 ElevatedButton(
                   onPressed: () => playQueueNotifier.playNext(),
-                  child: const Text('下一个'),
+                  child: Text(AppLocalizations.of(context)!.next),
                 ),
                 ElevatedButton(
                   onPressed: () => playQueueNotifier.clearQueue(),
-                  child: const Text('清空'),
+                  child: Text(AppLocalizations.of(context)!.clear),
                 ),
               ],
             ),

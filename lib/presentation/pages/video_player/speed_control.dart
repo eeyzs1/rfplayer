@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io' show Platform;
+import '../../../core/localization/app_localizations.dart';
 import 'video_player_controller.dart';
 
 class SpeedControl extends StatefulWidget {
@@ -157,7 +158,7 @@ class _SpeedControlState extends State<SpeedControl> {
           // 手动输入
           Row(
             children: [
-              const Text('自定义速率: ', style: TextStyle(color: Colors.white)),
+              Text('${AppLocalizations.of(context)!.customSpeed} ', style: TextStyle(color: Colors.white)),
               const SizedBox(width: 8),
               SizedBox(
                 width: 80,
@@ -186,7 +187,7 @@ class _SpeedControlState extends State<SpeedControl> {
                   backgroundColor: Colors.grey[800],
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('重置'),
+                child: Text(AppLocalizations.of(context)!.reset),
               ),
             ],
           ),

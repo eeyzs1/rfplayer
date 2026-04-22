@@ -38,6 +38,7 @@ class ImageViewerState {
   final ImageInfo? imageInfo;
   final bool isLoading;
   final String? customFileName;
+  final Uint8List? imageBytes;
 
   static const _sentinel = Object();
 
@@ -53,6 +54,7 @@ class ImageViewerState {
     this.imageInfo,
     this.isLoading = false,
     this.customFileName,
+    this.imageBytes,
   });
 
   String get currentFileName {
@@ -75,6 +77,7 @@ class ImageViewerState {
     Object? imageInfo = _sentinel,
     bool? isLoading,
     Object? customFileName = _sentinel,
+    Object? imageBytes = _sentinel,
   }) {
     return ImageViewerState(
       currentPath: currentPath ?? this.currentPath,
@@ -88,6 +91,7 @@ class ImageViewerState {
       imageInfo: identical(imageInfo, _sentinel) ? this.imageInfo : imageInfo as ImageInfo?,
       isLoading: isLoading ?? this.isLoading,
       customFileName: identical(customFileName, _sentinel) ? this.customFileName : customFileName as String?,
+      imageBytes: identical(imageBytes, _sentinel) ? this.imageBytes : imageBytes as Uint8List?,
     );
   }
 }
@@ -102,25 +106,33 @@ class ImageViewerNotifier extends StateNotifier<ImageViewerState> {
       imagePaths: [initialPath],
       isLoading: true,
       customFileName: customFileName,
+      imageBytes: initialBytes,
     ),
   ) {
     _initialBytes = initialBytes;
     _initialize();
   }
   
-  // 确保路径总是真实路径
   Future<String> _ensureRealPath(String path) async {
     if (RealPathUtils.isContentUri(path)) {
-      final safePath = await RealPathUtils.getSafePath(path);
-      if (safePath != null) {
-        return safePath;
+      final resolved = await RealPathUtils.resolveContentUri(path);
+      if (resolved.isPlayable && resolved.source == PathSource.realPath) {
+        return resolved.path;
+      }
+      if (resolved.isPlayable && resolved.source == PathSource.contentUri) {
+        final bytes = await RealPathUtils.readContentUriBytes(path);
+        if (bytes != null) {
+          state = state.copyWith(imageBytes: bytes);
+        }
+        if (resolved.displayName != null && state.customFileName == null) {
+          state = state.copyWith(customFileName: resolved.displayName);
+        }
       }
     }
     return path;
   }
 
   Future<void> _initialize() async {
-    // 先确保使用真实路径
     final realPath = await _ensureRealPath(state.currentPath);
     if (realPath != state.currentPath) {
       state = state.copyWith(
@@ -188,8 +200,20 @@ class ImageViewerNotifier extends StateNotifier<ImageViewerState> {
       String fileName;
       final effectivePath = state.currentPath;
 
-      if (_initialBytes != null) {
+      if (state.imageBytes != null) {
+        bytes = state.imageBytes!;
+        fileName = state.customFileName ?? p.basename(effectivePath);
+      } else if (_initialBytes != null) {
         bytes = _initialBytes!;
+        fileName = state.customFileName ?? p.basename(effectivePath);
+      } else if (RealPathUtils.isContentUri(effectivePath)) {
+        final contentBytes = await RealPathUtils.readContentUriBytes(effectivePath);
+        if (contentBytes != null) {
+          bytes = contentBytes;
+          state = state.copyWith(imageBytes: contentBytes);
+        } else {
+          return;
+        }
         fileName = state.customFileName ?? p.basename(effectivePath);
       } else {
         final file = File(effectivePath);
@@ -205,7 +229,7 @@ class ImageViewerNotifier extends StateNotifier<ImageViewerState> {
 
       int fileSize = bytes.length;
       DateTime modifiedAt = DateTime.now();
-      if (_initialBytes == null) {
+      if (!RealPathUtils.isContentUri(effectivePath) && _initialBytes == null && state.imageBytes == null) {
         try {
           final stat = await File(effectivePath).stat();
           fileSize = stat.size;

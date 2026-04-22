@@ -64,14 +64,20 @@ jobs:
       - name: Run code generation
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build APK
-        run: flutter build apk --release
+      - name: Build APK (split per ABI)
+        run: flutter build apk --split-per-abi --target-platform android-arm64,android-x64 --release
 
-      - name: Upload APK artifact
+      - name: Upload arm64-v8a APK
         uses: actions/upload-artifact@v4
         with:
-          name: rfplayer-android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: rfplayer-android-arm64-v8a
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+
+      - name: Upload x86_64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: rfplayer-android-x86_64
+          path: build/app/outputs/flutter-apk/app-x86_64-release.apk
 
   build-windows:
     name: Build Windows
@@ -96,8 +102,30 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Upload Windows artifact
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+        shell: pwsh
+
+      - name: Extract version from pubspec.yaml
+        id: version
+        shell: pwsh
+        run: |
+          $line = Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)'
+          $version = $line.Matches.Groups[1].Value.Split('+')[0]
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build Windows Installer
+        run: ISCC /DMyAppVersion=${{ steps.version.outputs.version }} windows/installer.iss
+        shell: pwsh
+
+      - name: Upload Windows Installer
         uses: actions/upload-artifact@v4
         with:
-          name: rfplayer-windows
+          name: rfplayer-windows-installer
+          path: build/windows/rfplayer_installer.exe
+
+      - name: Upload Windows Release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: rfplayer-windows-release
           path: build/windows/x64/runner/Release/

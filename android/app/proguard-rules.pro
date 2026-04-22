@@ -1,0 +1,7 @@
+-keep class com.mediadevkit.fvp.** { *; }
+-keep class com.example.rfplayer.** { *; }
+-keep class io.flutter.util.** { *; }
+-keep class io.flutter.plugin.** { *; }
+-dontwarn com.mediadevkit.fvp.**
+-dontwarn io.flutter.util.**
+-dontwarn com.google.android.play.core.**

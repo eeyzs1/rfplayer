@@ -1,6 +1,7 @@
 import 'dart:io';
 import '../database/daos/history_dao.dart';
 import '../models/play_history.dart';
+import '../../core/utils/real_path_utils.dart';
 
 class HistoryRepository {
   final HistoryDao _dao;
@@ -24,17 +25,34 @@ class HistoryRepository {
   }
 
   Future<void> deleteById(String id) async {
+    final record = await _dao.getById(id);
+    if (record != null) {
+      await _releaseUriPermissionIfNeeded(record.path);
+    }
     await _dao.deleteById(id);
   }
 
   Future<void> deleteAll() async {
+    if (Platform.isAndroid) {
+      final records = await _dao.getHistory(limit: 100000, offset: 0);
+      for (final record in records) {
+        await _releaseUriPermissionIfNeeded(record.path);
+      }
+    }
     await _dao.deleteAll();
   }
 
   Future<void> cleanupInvalidRecords() async {
     final records = await _dao.getHistory(limit: 1000, offset: 0);
     for (final record in records) {
-      if (!record.path.startsWith('content://')) {
+      if (record.path.startsWith('content://')) {
+        if (Platform.isAndroid) {
+          final hasPermission = await RealPathUtils.hasPersistableUriPermission(record.path);
+          if (!hasPermission) {
+            await _dao.deleteById(record.id);
+          }
+        }
+      } else {
         if (!File(record.path).existsSync()) {
           await _dao.deleteById(record.id);
         }
@@ -70,6 +88,14 @@ class HistoryRepository {
   }
 
   Future<void> deleteByPath(String path) async {
+    await _releaseUriPermissionIfNeeded(path);
     await _dao.deleteByPath(path);
+  }
+
+  Future<void> _releaseUriPermissionIfNeeded(String path) async {
+    if (!Platform.isAndroid) return;
+    if (RealPathUtils.isContentUri(path)) {
+      await RealPathUtils.releasePersistableUriPermission(path);
+    }
   }
 }

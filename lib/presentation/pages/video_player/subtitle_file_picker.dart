@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fast_file_picker/fast_file_picker.dart';
 import 'package:path/path.dart' as p;
 import '../../../core/constants/supported_formats.dart';
+import '../../../core/localization/app_localizations.dart';
 import '../../../core/utils/file_utils.dart';
 
 class SubtitleFilePicker {
@@ -167,7 +168,7 @@ class _SubtitlePickerDialogState extends State<_SubtitlePickerDialog> {
         children: [
           const Icon(Icons.subtitles, size: 24),
           const SizedBox(width: 12),
-          const Text('Select Subtitle File', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(AppLocalizations.of(context)!.selectSubtitleFile, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const Spacer(),
           IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
         ],
@@ -185,7 +186,7 @@ class _SubtitlePickerDialogState extends State<_SubtitlePickerDialog> {
           const SizedBox(width: 4),
           Expanded(child: Text(_currentPath ?? '...', style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
           const SizedBox(width: 4),
-          TextButton.icon(onPressed: _browseDirectory, icon: const Icon(Icons.folder_open, size: 18), label: const Text('Browse', style: TextStyle(fontSize: 13))),
+          TextButton.icon(onPressed: _browseDirectory, icon: const Icon(Icons.folder_open, size: 18), label: Text(AppLocalizations.of(context)!.browse, style: TextStyle(fontSize: 13))),
         ],
       ),
     );
@@ -203,7 +204,7 @@ class _SubtitlePickerDialogState extends State<_SubtitlePickerDialog> {
           const SizedBox(height: 12),
           Text(_error!, style: TextStyle(color: Colors.red[400])),
           const SizedBox(height: 12),
-          TextButton(onPressed: () => _loadFiles(_currentPath!), child: const Text('Retry')),
+          TextButton(onPressed: () => _loadFiles(_currentPath!), child: Text(AppLocalizations.of(context)!.retry)),
         ]),
       );
     }
@@ -213,11 +214,11 @@ class _SubtitlePickerDialogState extends State<_SubtitlePickerDialog> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.description_outlined, size: 48, color: Colors.grey[400]),
           const SizedBox(height: 12),
-          Text('No subtitle files in this directory', style: TextStyle(color: Colors.grey[500])),
+          Text(AppLocalizations.of(context)!.noSubtitleFiles, style: TextStyle(color: Colors.grey[500])),
           const SizedBox(height: 4),
-          Text('Supported: ${subtitleFormats.join(', ')}', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+          Text('${AppLocalizations.of(context)!.format}: ${subtitleFormats.join(', ')}', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
           const SizedBox(height: 8),
-          TextButton.icon(onPressed: _browseDirectory, icon: const Icon(Icons.folder_open), label: const Text('Choose another folder')),
+          TextButton.icon(onPressed: _browseDirectory, icon: const Icon(Icons.folder_open), label: Text(AppLocalizations.of(context)!.chooseAnotherFolder)),
         ]),
       );
     }
@@ -257,7 +258,7 @@ class _SubtitlePickerDialogState extends State<_SubtitlePickerDialog> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).dividerColor))),
       child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(AppLocalizations.of(context)!.cancel)),
       ]),
     );
   }

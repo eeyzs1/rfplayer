@@ -5,14 +5,11 @@ import android.content.ContentUris
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
-import java.io.File
-import java.io.FileOutputStream
 
 object RealPathUtil {
     private const val TAG = "RealPathUtil"
@@ -20,17 +17,15 @@ object RealPathUtil {
     @SuppressLint("NewApi")
     fun getRealPath(context: Context, uri: Uri): String? {
         Log.d(TAG, "getRealPath: uri=$uri")
-        
-        // DocumentProvider
+
         if (DocumentsContract.isDocumentUri(context, uri)) {
             Log.d(TAG, "It's a DocumentProvider URI")
-            
-            // ExternalStorageProvider
+
             if (isExternalStorageDocument(uri)) {
                 val docId = DocumentsContract.getDocumentId(uri)
                 val split = docId.split(":".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
                 val type = split[0]
-                
+
                 if ("primary".equals(type, ignoreCase = true)) {
                     val path = Environment.getExternalStorageDirectory().toString() + "/" + split[1]
                     Log.d(TAG, "ExternalStorage primary path: $path")
@@ -40,44 +35,27 @@ object RealPathUtil {
                 Log.d(TAG, "It's a DownloadsDocument URI")
                 val docId = DocumentsContract.getDocumentId(uri)
                 Log.d(TAG, "Downloads docId: $docId")
-                
-                // Try to handle msf: prefix by querying MediaStore
-                if (docId.startsWith("msf:")) {
-                    val id = docId.substringAfter("msf:")
-                    Log.d(TAG, "Extracted msf id: $id")
-                    
-                    // Try Images first
-                    var path = queryMediaStore(context, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-                    if (path != null) {
-                        Log.d(TAG, "Found in MediaStore.Images: $path")
-                        return path
-                    }
-                    
-                    // Try Videos
-                    path = queryMediaStore(context, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
-                    if (path != null) {
-                        Log.d(TAG, "Found in MediaStore.Video: $path")
-                        return path
-                    }
-                    
-                    // Try Audio
-                    path = queryMediaStore(context, MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
-                    if (path != null) {
-                        Log.d(TAG, "Found in MediaStore.Audio: $path")
-                        return path
-                    }
-                    
-                    Log.d(TAG, "Not found in MediaStore, trying Downloads provider")
-                }
-                
-                // Try raw: prefix
+
                 if (docId.startsWith("raw:")) {
                     val path = docId.substringAfter("raw:")
                     Log.d(TAG, "Raw path: $path")
                     return path
                 }
-                
-                // Try normal id with Downloads provider
+
+                if (docId.startsWith("msf:")) {
+                    val id = docId.substringAfter("msf:")
+                    Log.d(TAG, "Extracted msf id: $id")
+
+                    val path = queryMediaStoreById(context, id)
+                    if (path != null) {
+                        Log.d(TAG, "Found via msf id in MediaStore: $path")
+                        return path
+                    }
+
+                    Log.d(TAG, "msf id not found in MediaStore")
+                    return null
+                }
+
                 try {
                     val id = docId.toLong()
                     val contentUri = ContentUris.withAppendedId(
@@ -90,24 +68,24 @@ object RealPathUtil {
                         return path
                     }
                 } catch (e: NumberFormatException) {
-                    Log.e(TAG, "Failed to parse docId as number", e)
+                    Log.e(TAG, "Failed to parse docId as number: $docId", e)
                 }
             } else if (isMediaDocument(uri)) {
                 Log.d(TAG, "It's a MediaDocument URI")
                 val docId = DocumentsContract.getDocumentId(uri)
                 val split = docId.split(":".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
                 val type = split[0]
-                
+
                 var contentUri: Uri? = null
                 when (type) {
                     "image" -> contentUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                     "video" -> contentUri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
                     "audio" -> contentUri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
                 }
-                
+
                 val selection = "_id=?"
                 val selectionArgs = arrayOf(split[1])
-                
+
                 Log.d(TAG, "Media contentUri: $contentUri, id: ${split[1]}")
                 return getDataColumn(context, contentUri, selection, selectionArgs)
             }
@@ -118,57 +96,52 @@ object RealPathUtil {
             Log.d(TAG, "It's a file URI")
             return uri.path
         }
-        
-        Log.d(TAG, "All methods failed, trying to get display name and check common paths")
-        return tryCommonPaths(context, uri)
+
+        Log.d(TAG, "Could not resolve real path")
+        return null
     }
 
-    private fun queryMediaStore(context: Context, contentUri: Uri, id: String): String? {
-        val selection = "_id=?"
-        val selectionArgs = arrayOf(id)
-        return getDataColumn(context, contentUri, selection, selectionArgs)
-    }
-
-    private fun tryCommonPaths(context: Context, uri: Uri): String? {
-        val fileName = getFileName(context, uri) ?: return null
-        Log.d(TAG, "Looking for file: $fileName")
-        
-        // Try common directories
-        val directories = listOf(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
-            File(Environment.getExternalStorageDirectory(), "Download"),
-            File(Environment.getExternalStorageDirectory(), "Pictures"),
-            File(Environment.getExternalStorageDirectory(), "Movies"),
-            File(Environment.getExternalStorageDirectory(), "DCIM")
-        )
-        
-        for (dir in directories) {
-            if (dir != null && dir.exists()) {
-                val file = File(dir, fileName)
-                if (file.exists()) {
-                    Log.d(TAG, "Found in ${dir.absolutePath}: ${file.absolutePath}")
-                    return file.absolutePath
+    fun getDisplayName(context: Context, uri: Uri): String? {
+        if (uri.scheme != "content") return null
+        try {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        return it.getString(nameIndex)
+                    }
                 }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "getDisplayName error", e)
         }
-        
-        Log.d(TAG, "File not found in common paths")
+        return null
+    }
+
+    private fun queryMediaStoreById(context: Context, id: String): String? {
+        val uris = listOf(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        )
+        for (uri in uris) {
+            val path = getDataColumn(context, uri, "_id=?", arrayOf(id))
+            if (path != null) return path
+        }
         return null
     }
 
     private fun getDataColumn(
-        context: Context, 
-        uri: Uri?, 
-        selection: String?, 
+        context: Context,
+        uri: Uri?,
+        selection: String?,
         selectionArgs: Array<String>?
     ): String? {
         var cursor: Cursor? = null
         val column = "_data"
         val projection = arrayOf(column)
-        
+
         try {
             cursor = context.contentResolver.query(uri!!, projection, selection, selectionArgs, null)
             if (cursor != null && cursor.moveToFirst()) {
@@ -183,29 +156,6 @@ object RealPathUtil {
             cursor?.close()
         }
         return null
-    }
-
-    private fun getFileName(context: Context, uri: Uri): String? {
-        var result: String? = null
-        if (uri.scheme == "content") {
-            val cursor = context.contentResolver.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0) {
-                        result = it.getString(nameIndex)
-                    }
-                }
-            }
-        }
-        if (result == null) {
-            result = uri.path
-            val cut = result!!.lastIndexOf('/')
-            if (cut != -1) {
-                result = result!!.substring(cut + 1)
-            }
-        }
-        return result
     }
 
     private fun isExternalStorageDocument(uri: Uri): Boolean {

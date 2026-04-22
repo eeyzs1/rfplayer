@@ -4,10 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fast_file_picker/fast_file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import '../../../router/app_router.dart';
-import '../../../../data/models/app_settings.dart';
 import '../../../../core/utils/real_path_utils.dart';
 import '../../../../core/utils/file_utils.dart';
-import '../../../providers/settings_provider.dart';
 
 class FeatureCard extends ConsumerWidget {
   final IconData icon;
@@ -47,21 +45,20 @@ class FeatureCard extends ConsumerWidget {
           if (result != null) {
             String? pathToUse;
             String? originalContentUri;
+            bool needsPersistRequest = false;
+            bool canStoreInHistory = true;
             
             if (result.path != null) {
               pathToUse = result.path;
             } else if (result.uri != null) {
               final contentUri = result.uri.toString();
               
-              final settings = ref.read(settingsProvider);
-              if (settings.historySaveMode == HistorySaveMode.virtualPath && Platform.isAndroid) {
-                final persisted = await RealPathUtils.takePersistableUriPermission(contentUri);
-                if (persisted) {
-                  originalContentUri = contentUri;
-                }
-              }
-              
-              pathToUse = await RealPathUtils.getSafePath(contentUri);
+              final resolved = await RealPathUtils.resolveContentUri(contentUri);
+              if (!resolved.isPlayable) return;
+              pathToUse = resolved.path;
+              originalContentUri = resolved.originalContentUri;
+              needsPersistRequest = resolved.needsPersistRequest;
+              canStoreInHistory = resolved.canStoreInHistory;
             }
             
             if (pathToUse != null) {
@@ -69,6 +66,8 @@ class FeatureCard extends ConsumerWidget {
                 'path': pathToUse,
                 'name': result.name,
                 'originalContentUri': originalContentUri,
+                'needsPersistRequest': needsPersistRequest,
+                'canStoreInHistory': canStoreInHistory,
               });
             }
           }
