@@ -40,7 +40,9 @@ class IntentUtils {
           }
         }
       }
-    } on PlatformException {}
+    } on PlatformException {
+      return null;
+    }
 
     try {
       final args = Platform.executableArguments;
@@ -51,7 +53,9 @@ class IntentUtils {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      return null;
+    }
 
     return null;
   }

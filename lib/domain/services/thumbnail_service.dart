@@ -1,12 +1,10 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
-import '../../data/models/play_history.dart' show MediaType;
 import '../../core/utils/real_path_utils.dart';
 
 class ThumbnailService {

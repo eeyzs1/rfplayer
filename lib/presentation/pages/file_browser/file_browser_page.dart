@@ -7,7 +7,6 @@ import 'package:file_selector/file_selector.dart';
 import '../../router/app_router.dart';
 import '../../providers/history_provider.dart';
 import '../../providers/thumbnail_provider.dart';
-import '../../providers/permission_provider.dart';
 import '../../../data/models/play_history.dart';
 import '../../../core/extensions/string_extensions.dart';
 import '../../../core/localization/app_localizations.dart';
