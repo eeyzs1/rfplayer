@@ -190,6 +190,38 @@ jobs:
             ./release/rfplayer_installer.zip
             ./release/rfplayer_installer.exe
             ./release/checksums.txt
-          generate_release_notes: true
+          body: |
+            ## RFPlayer - 跨平台媒体播放器 / Cross-platform Media Player
+
+            RFPlayer 是一款基于 Flutter 开发的跨平台媒体播放器，支持 Windows 和 Android 平台，可播放视频、音频和图片文件。
+
+            RFPlayer is a cross-platform media player built with Flutter, supporting Windows and Android, capable of playing video, audio, and image files.
+
+            ### ✨ 主要功能 / Key Features
+            - 🎬 视频播放（支持 mp4, mkv, avi, mov, wmv, flv, webm 等主流格式）
+            - 🎵 音频播放（支持 mp3, wav, flac, aac, ogg, opus 等格式）
+            - 🖼️ 图片查看（支持 jpg, png, gif, bmp, webp, svg 等格式）
+            - 📝 字幕支持（SRT, ASS, SSA, VTT 等格式）
+            - 🔖 书签与播放历史
+            - 📂 文件浏览器与播放队列
+            - 🌐 中英文双语支持
+
+            ---
+
+            ### 📦 下载 / Downloads
+
+            | 文件 / File | 平台 / Platform | 说明 / Description |
+            |---|---|---|
+            | `rfplayer_installer.exe` | Windows x64 | **推荐** Windows 安装程序，自动注册右键"打开方式"菜单，支持关联视频/音频/图片文件 |
+            | `rfplayer_installer.zip` | Windows x64 | Windows 便携版，解压即可运行，无需安装 |
+            | `rfplayer_installer_arm64-v8a.apk` | Android ARM64 | 适用于绝大多数现代 Android 手机（如骁龙、天玑等处理器） |
+            | `rfplayer_installer_x86_64.apk` | Android x86_64 | 适用于 Android 模拟器或 x86_64 设备 |
+            | `checksums.txt` | - | 所有文件的 SHA256 校验和，用于验证下载完整性 |
+
+            ---
+
+            ### 💻 系统要求 / System Requirements
+            - **Windows**: Windows 10 及以上（64位）
+            - **Android**: Android 5.0 (API 21) 及以上
           draft: false
           prerelease: false
