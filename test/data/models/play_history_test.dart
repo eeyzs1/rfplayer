@@ -129,10 +129,11 @@ void main() {
 
     group('MediaType', () {
       test('MediaType.values contains all types', () {
-        expect(MediaType.values.length, 3);
+        expect(MediaType.values.length, 4);
         expect(MediaType.values, contains(MediaType.video));
         expect(MediaType.values, contains(MediaType.image));
         expect(MediaType.values, contains(MediaType.audio));
+        expect(MediaType.values, contains(MediaType.unknown));
       });
     });
   });
